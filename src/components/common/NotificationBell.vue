@@ -40,23 +40,41 @@
       @click.stop
     >
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0">
-        <h2 class="text-xl font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
+      <div class="px-6 py-4 border-b border-gray-200 bg-white sticky top-0">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-gray-900">Notifications</h2>
+          <div class="flex items-center gap-3">
+            <button
+              v-if="unreadCount > 0"
+              @click="markAllAsRead"
+              class="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Mark all read
+            </button>
+            <button
+              @click="closeSidebar"
+              class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Subscription Info -->
+        <div class="mt-3 pt-3 border-t border-gray-100">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-600">Subscribed to:</span>
+            <span class="text-xs font-medium text-gray-900">{{ subscriptionCount || 0 }} objectives</span>
+          </div>
           <button
-            v-if="unreadCount > 0"
-            @click="markAllAsRead"
-            class="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            v-if="subscriptionCount > 0"
+            @click="unsubscribeFromAll"
+            :disabled="unsubscribing"
+            class="w-full mt-2 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Mark all read
-          </button>
-          <button
-            @click="closeSidebar"
-            class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            {{ unsubscribing ? 'Unsubscribing...' : 'Unsubscribe from all objectives' }}
           </button>
         </div>
       </div>
@@ -136,6 +154,7 @@ import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useUsersStore } from '@/stores/users'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 
 const router = useRouter()
 const notificationsStore = useNotificationsStore()
@@ -144,6 +163,8 @@ const authStore = useAuthStore()
 
 const isOpen = ref(false)
 const loading = ref(false)
+const subscriptionCount = ref(null)
+const unsubscribing = ref(false)
 
 const notifications = computed(() => notificationsStore.notifications)
 const unreadCount = computed(() => notificationsStore.unreadCount)
@@ -192,12 +213,45 @@ onUnmounted(() => {
 async function loadNotifications() {
   loading.value = true
   try {
-    await notificationsStore.fetchNotifications(50, false)
-    await notificationsStore.fetchUnreadCount()
+    await Promise.all([
+      notificationsStore.fetchNotifications(50, false),
+      notificationsStore.fetchUnreadCount(),
+      loadSubscriptionCount()
+    ])
   } catch (error) {
     console.error('Error loading notifications:', error)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadSubscriptionCount() {
+  try {
+    const response = await api.get('/objectives/subscriptions/count')
+    subscriptionCount.value = response.data.subscription_count || 0
+  } catch (error) {
+    console.error('Error loading subscription count:', error)
+    subscriptionCount.value = null
+  }
+}
+
+async function unsubscribeFromAll() {
+  if (!confirm('Are you sure you want to unsubscribe from all objectives? You will stop receiving notifications for updates.')) {
+    return
+  }
+  
+  unsubscribing.value = true
+  try {
+    await api.delete('/objectives/subscribe/all')
+    subscriptionCount.value = 0
+    alert('Successfully unsubscribed from all objectives.')
+    // Reload notifications to remove subscription-related ones
+    await loadNotifications()
+  } catch (error) {
+    console.error('Error unsubscribing from all:', error)
+    alert('Failed to unsubscribe from all objectives. Please try again.')
+  } finally {
+    unsubscribing.value = false
   }
 }
 
