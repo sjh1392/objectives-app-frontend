@@ -1,0 +1,120 @@
+<template>
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+      <div>
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Reset your password
+        </h2>
+      </div>
+      <form class="mt-8 space-y-6" @submit.prevent="handleResetPassword">
+        <div v-if="error" class="rounded-md bg-red-50 p-4">
+          <div class="flex">
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-red-800">{{ error }}</h3>
+            </div>
+          </div>
+        </div>
+        <div v-if="success" class="rounded-md bg-green-50 p-4">
+          <div class="flex">
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-green-800">
+                Password reset successfully! Redirecting to login...
+              </h3>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-md shadow-sm space-y-4">
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">New Password</label>
+            <input
+              id="password"
+              v-model="password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              required
+              minlength="8"
+              class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Password (min 8 characters)"
+            />
+          </div>
+          <div>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+            <input
+              id="confirmPassword"
+              v-model="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              minlength="8"
+              class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Confirm password"
+            />
+          </div>
+        </div>
+        <div>
+          <button
+            type="submit"
+            :disabled="loading || password !== confirmPassword"
+            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span v-if="loading">Resetting...</span>
+            <span v-else>Reset Password</span>
+          </button>
+        </div>
+        <div v-if="password && confirmPassword && password !== confirmPassword" class="text-sm text-red-600 text-center">
+          Passwords do not match
+        </div>
+      </form>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+const token = ref(route.query.token || '')
+const password = ref('')
+const confirmPassword = ref('')
+const error = ref('')
+const success = ref(false)
+const loading = ref(false)
+
+onMounted(() => {
+  if (!token.value) {
+    error.value = 'Reset token is required'
+  }
+})
+
+const handleResetPassword = async () => {
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match'
+    return
+  }
+  
+  error.value = ''
+  success.value = false
+  loading.value = true
+  
+  const result = await authStore.resetPassword(token.value, password.value)
+  
+  if (result.success) {
+    success.value = true
+    setTimeout(() => {
+      router.push('/login')
+    }, 2000)
+  } else {
+    error.value = result.error
+  }
+  
+  loading.value = false
+}
+</script>
+

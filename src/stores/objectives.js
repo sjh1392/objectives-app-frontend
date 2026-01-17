@@ -147,11 +147,12 @@ export const useObjectivesStore = defineStore('objectives', {
       }
     },
 
-    async updateProgress(id, currentValue, notes) {
+    async updateProgress(id, currentValue, notes, userId = null) {
       try {
         const response = await api.patch(`/objectives/${id}/progress`, {
           current_value: currentValue,
-          notes
+          notes,
+          user_id: userId
         })
         const index = this.objectives.findIndex(obj => obj.id === id)
         if (index !== -1) {

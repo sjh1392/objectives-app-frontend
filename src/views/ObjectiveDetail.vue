@@ -452,6 +452,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useObjectivesStore } from '../stores/objectives'
 import { useUsersStore } from '../stores/users'
+import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/layout/AppLayout.vue'
 import ProgressBar from '../components/common/ProgressBar.vue'
 import Tag from '../components/common/Tag.vue'
@@ -796,7 +797,9 @@ async function submitUpdate() {
   
   const commentText = updateForm.value.comment.trim()
   const currentValue = updateForm.value.current_value
-  const currentUserId = usersStore.users[0]?.id // TODO: Get current logged-in user
+  // Get current user from auth store
+  const authStore = useAuthStore()
+  const currentUserId = authStore.currentUserId || usersStore.users[0]?.id || null
   
   // Store original state for potential rollback
   const originalComments = [...comments.value]
@@ -819,8 +822,70 @@ async function submitUpdate() {
       await objectivesStore.updateProgress(
         route.params.id,
         currentValue,
-        commentText || ''
+        commentText || '',
+        currentUserId
       )
+      
+      // If comment text is also provided, create a separate comment
+      if (commentText && commentText.trim()) {
+        if (!currentUserId) {
+          console.error('Cannot save comment: user_id is not set')
+        } else {
+          // Create comment optimistically
+          const tempComment = {
+            id: `temp-${Date.now()}`,
+            objective_id: route.params.id,
+            user_id: currentUserId,
+            content: commentText,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            user_name: usersStore.users.find(u => u.id === currentUserId)?.name || 'Unknown',
+            user_email: usersStore.users.find(u => u.id === currentUserId)?.email || ''
+          }
+          
+          // Add comment optimistically to the top of the list
+          comments.value = [tempComment, ...comments.value]
+          
+          // Send comment to server
+          try {
+            const commentResponse = await api.post(`/objectives/${route.params.id}/comments`, {
+              user_id: currentUserId,
+              content: commentText
+            })
+            
+            if (commentResponse.data) {
+              const commentIndex = comments.value.findIndex(c => c.id === tempComment.id)
+              if (commentIndex !== -1) {
+                comments.value[commentIndex] = commentResponse.data
+              } else {
+                comments.value = [commentResponse.data, ...comments.value.filter(c => c.id !== tempComment.id)]
+              }
+            }
+          } catch (commentError) {
+            console.error('Error creating comment:', commentError)
+            // Remove temp comment on error
+            comments.value = comments.value.filter(c => c.id !== tempComment.id)
+          }
+        }
+      }
+      
+      // Reset form
+      updateForm.value.comment = ''
+      updateForm.value.current_value = null
+      
+      // Reload data in background
+      Promise.all([
+        loadObjective(),
+        loadComments(),
+        loadProgressUpdates()
+      ]).catch(err => {
+        console.error('Background refresh failed:', err)
+        // Revert on error
+        comments.value = originalComments
+        if (objective.value) {
+          objectivesStore.currentObjective = originalObjective
+        }
+      })
     } else if (commentText) {
       // If only comment is provided (no value), create a comment optimistically
       const tempComment = {
