@@ -838,35 +838,74 @@ async function submitUpdate() {
       comments.value = [tempComment, ...comments.value]
       
       // Send to server
+      if (!currentUserId) {
+        console.error('Cannot save comment: user_id is not set')
+        alert('Error: User not identified. Please refresh the page.')
+        comments.value = originalComments
+        return
+      }
+      
       const response = await api.post(`/objectives/${route.params.id}/comments`, {
         user_id: currentUserId,
         content: commentText
       })
       
+      if (!response.data) {
+        console.error('Comment API returned no data:', response)
+        throw new Error('Comment saved but no data returned')
+      }
+      
       // Replace temp comment with real one from server
-      const commentIndex = comments.value.findIndex(c => c.id === tempComment.id)
-      if (commentIndex !== -1) {
-        comments.value[commentIndex] = response.data
+      if (response.data) {
+        const commentIndex = comments.value.findIndex(c => c.id === tempComment.id)
+        if (commentIndex !== -1) {
+          comments.value[commentIndex] = response.data
+        } else {
+          // If temp comment not found, add the real one at the top
+          comments.value = [response.data, ...comments.value.filter(c => c.id !== tempComment.id)]
+        }
+      } else {
+        console.warn('Comment saved but no data returned from server')
       }
+      
+      // Reset form
+      updateForm.value.comment = ''
+      updateForm.value.current_value = null
+      
+      // Refresh other data in background, but keep the comment we just added
+      Promise.all([
+        loadObjective(),
+        loadProgressUpdates()
+      ]).catch(err => {
+        console.error('Background refresh failed:', err)
+      })
+      
+      // Reload comments after a short delay to ensure it's in the database and synced
+      setTimeout(() => {
+        loadComments().catch(err => {
+          console.error('Failed to reload comments:', err)
+          // Don't revert - keep the optimistic update if reload fails
+        })
+      }, 500)
+    } else {
+      // Reset form
+      updateForm.value.comment = ''
+      updateForm.value.current_value = null
+      
+      // Silently refresh data in background
+      Promise.all([
+        loadObjective(),
+        loadComments(),
+        loadProgressUpdates()
+      ]).catch(err => {
+        console.error('Background refresh failed:', err)
+        // Revert on error
+        comments.value = originalComments
+        if (objective.value) {
+          objectivesStore.currentObjective = originalObjective
+        }
+      })
     }
-    
-    // Reset form
-    updateForm.value.comment = ''
-    updateForm.value.current_value = null
-    
-    // Silently refresh data in background
-    Promise.all([
-      loadObjective(),
-      loadComments(),
-      loadProgressUpdates()
-    ]).catch(err => {
-      console.error('Background refresh failed:', err)
-      // Revert on error
-      comments.value = originalComments
-      if (objective.value) {
-        objectivesStore.currentObjective = originalObjective
-      }
-    })
   } catch (error) {
     console.error('Error submitting update:', error)
     
