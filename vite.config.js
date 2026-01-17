@@ -19,6 +19,10 @@ export default defineConfig({
     }
   },
   // Expose environment variables to the client
-  envPrefix: 'VITE_'
+  envPrefix: 'VITE_',
+  // Inject build-time timestamp
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString())
+  }
 })
 

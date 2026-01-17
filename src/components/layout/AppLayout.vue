@@ -52,13 +52,13 @@
 
     <div class="flex flex-1 overflow-hidden">
       <!-- Sidebar -->
-      <aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto">
+      <aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
         <div class="p-6">
           <h1 v-if="companyStore.name" class="text-2xl font-bold text-gray-800">{{ companyStore.name }}</h1>
           <div v-else class="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
           <p class="text-sm text-gray-500 mt-1">Management System</p>
         </div>
-        <nav class="mt-8">
+        <nav class="mt-8 flex-1">
           <router-link
             v-for="item in navItems"
             :key="item.path"
@@ -70,6 +70,19 @@
             <span>{{ item.label }}</span>
           </router-link>
         </nav>
+        
+        <!-- Sidebar Footer with Deploy Time -->
+        <div class="mt-auto px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div class="text-xs text-gray-500">
+            <div class="font-medium text-gray-600 mb-1">Build Info</div>
+            <div v-if="buildTime" class="text-gray-500">
+              Deployed: {{ formatBuildTime(buildTime) }}
+            </div>
+            <div v-else class="text-gray-400 italic">
+              Local development
+            </div>
+          </div>
+        </div>
       </aside>
 
       <!-- Main Content -->
@@ -105,6 +118,10 @@ const companyStore = useCompanyStore()
 
 const commandPaletteRef = ref(null)
 
+// Get build time from Vite define (injected at build time)
+// @ts-ignore - __BUILD_TIME__ is injected by Vite at build time
+const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null
+
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'grid' },
   { path: '/objectives', label: 'Objectives', icon: 'target' },
@@ -128,6 +145,34 @@ function getIcon(iconName) {
     rocket: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>'
   }
   return icons[iconName] || ''
+}
+
+function formatBuildTime(timestamp) {
+  try {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    // Format as relative time if recent, otherwise absolute
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    
+    // For older deployments, show formatted date
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (e) {
+    return timestamp
+  }
 }
 
 function openCommandPalette() {
