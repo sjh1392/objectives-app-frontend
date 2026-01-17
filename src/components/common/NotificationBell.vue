@@ -1,7 +1,7 @@
 <template>
-  <div class="relative">
+  <div>
     <button
-      @click="toggleDropdown"
+      @click="openSidebar"
       class="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg transition-colors"
       :class="{ 'text-blue-600': isOpen }"
     >
@@ -26,16 +26,23 @@
       </span>
     </button>
 
-    <!-- Dropdown -->
+    <!-- Sidebar Overlay -->
     <div
       v-if="isOpen"
-      v-click-outside="closeDropdown"
-      class="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden flex flex-col"
+      class="fixed inset-0 bg-black bg-opacity-50 z-50 transition-opacity"
+      @click="closeSidebar"
+    ></div>
+
+    <!-- Sidebar Panel -->
+    <div
+      v-if="isOpen"
+      class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out"
+      @click.stop
     >
       <!-- Header -->
-      <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">Notifications</h3>
-        <div class="flex items-center gap-2">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0">
+        <h2 class="text-xl font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
           <button
             v-if="unreadCount > 0"
             @click="markAllAsRead"
@@ -44,10 +51,10 @@
             Mark all read
           </button>
           <button
-            @click="closeDropdown"
-            class="text-gray-400 hover:text-gray-600"
+            @click="closeSidebar"
+            class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -55,38 +62,68 @@
       </div>
 
       <!-- Notifications List -->
-      <div class="overflow-y-auto flex-1">
-        <div v-if="loading" class="p-4 text-center text-gray-500">
-          Loading...
+      <div class="flex-1 overflow-y-auto">
+        <div v-if="loading" class="p-8 text-center text-gray-500">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p class="mt-2">Loading notifications...</p>
         </div>
         <div v-else-if="notifications.length === 0" class="p-8 text-center text-gray-500">
-          <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          <p>No notifications</p>
+          <p class="text-gray-500">No notifications</p>
+          <p class="text-sm text-gray-400 mt-1">You're all caught up!</p>
         </div>
-        <div v-else class="divide-y divide-gray-100">
-          <button
+        <div v-else class="divide-y divide-gray-200">
+          <div
             v-for="notification in notifications"
             :key="notification.id"
-            @click="handleNotificationClick(notification)"
-            class="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+            class="px-6 py-4 hover:bg-gray-50 transition-colors"
             :class="{ 'bg-blue-50': !notification.read }"
           >
             <div class="flex items-start gap-3">
               <div class="flex-shrink-0 mt-1">
                 <div
-                  class="w-2 h-2 rounded-full"
+                  class="w-2.5 h-2.5 rounded-full"
                   :class="notification.read ? 'bg-transparent' : 'bg-blue-500'"
                 ></div>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900">{{ notification.title }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ notification.message }}</p>
-                <p class="text-xs text-gray-400 mt-1">{{ formatTime(notification.created_at) }}</p>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-gray-900">{{ notification.title }}</p>
+                    <p class="text-sm text-gray-600 mt-1 leading-relaxed whitespace-pre-wrap">{{ notification.message }}</p>
+                    <p class="text-xs text-gray-400 mt-2">{{ formatTime(notification.created_at) }}</p>
+                  </div>
+                  <button
+                    @click.stop="deleteNotification(notification.id)"
+                    class="flex-shrink-0 text-gray-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors"
+                    title="Delete notification"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="flex items-center gap-3 mt-3">
+                  <button
+                    v-if="!notification.read"
+                    @click.stop="markAsRead(notification.id)"
+                    class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Mark as read
+                  </button>
+                  <button
+                    v-if="notification.objective_id"
+                    @click.stop="goToObjective(notification.objective_id)"
+                    class="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    View objective →
+                  </button>
+                </div>
               </div>
             </div>
-          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -112,6 +149,7 @@ const notifications = computed(() => notificationsStore.notifications)
 const unreadCount = computed(() => notificationsStore.unreadCount)
 
 let refreshInterval = null
+let escapeHandler = null
 
 onMounted(async () => {
   // Set current user from auth store
@@ -130,12 +168,25 @@ onMounted(async () => {
       await notificationsStore.refreshNotifications()
     }
   }, 30000)
+  
+  // Handle escape key to close sidebar
+  escapeHandler = (e) => {
+    if (e.key === 'Escape' && isOpen.value) {
+      closeSidebar()
+    }
+  }
+  window.addEventListener('keydown', escapeHandler)
 })
 
 onUnmounted(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval)
   }
+  if (escapeHandler) {
+    window.removeEventListener('keydown', escapeHandler)
+  }
+  // Ensure body scroll is restored if component unmounts with sidebar open
+  document.body.style.overflow = ''
 })
 
 async function loadNotifications() {
@@ -150,32 +201,49 @@ async function loadNotifications() {
   }
 }
 
-function toggleDropdown() {
-  isOpen.value = !isOpen.value
-  if (isOpen.value && notifications.value.length === 0) {
+function openSidebar() {
+  isOpen.value = true
+  if (notifications.value.length === 0) {
     loadNotifications()
   }
+  // Prevent body scroll when sidebar is open
+  document.body.style.overflow = 'hidden'
 }
 
-function closeDropdown() {
+function closeSidebar() {
   isOpen.value = false
+  // Restore body scroll
+  document.body.style.overflow = ''
 }
 
-async function handleNotificationClick(notification) {
-  if (!notification.read) {
-    await notificationsStore.markAsRead(notification.id)
+async function markAsRead(notificationId) {
+  try {
+    await notificationsStore.markAsRead(notificationId)
+  } catch (error) {
+    console.error('Error marking notification as read:', error)
   }
-  
-  closeDropdown()
-  
-  // Navigate to objective if available
-  if (notification.objective_id) {
-    router.push(`/objectives/${notification.objective_id}`)
+}
+
+async function deleteNotification(notificationId) {
+  try {
+    await notificationsStore.deleteNotification(notificationId)
+  } catch (error) {
+    console.error('Error deleting notification:', error)
+    alert('Failed to delete notification. Please try again.')
   }
 }
 
 async function markAllAsRead() {
-  await notificationsStore.markAllAsRead()
+  try {
+    await notificationsStore.markAllAsRead()
+  } catch (error) {
+    console.error('Error marking all as read:', error)
+  }
+}
+
+function goToObjective(objectiveId) {
+  closeSidebar()
+  router.push(`/objectives/${objectiveId}`)
 }
 
 function formatTime(dateString) {
@@ -195,19 +263,5 @@ function formatTime(dateString) {
   return date.toLocaleDateString()
 }
 
-// Click outside directive
-const vClickOutside = {
-  mounted(el, binding) {
-    el.clickOutsideEvent = (event) => {
-      if (!(el === event.target || el.contains(event.target))) {
-        binding.value()
-      }
-    }
-    document.addEventListener('click', el.clickOutsideEvent)
-  },
-  unmounted(el) {
-    document.removeEventListener('click', el.clickOutsideEvent)
-  }
-}
 </script>
 

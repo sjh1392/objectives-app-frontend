@@ -100,6 +100,24 @@ export const useNotificationsStore = defineStore('notifications', {
       }
     },
 
+    async deleteNotification(notificationId) {
+      try {
+        await api.delete(`/notifications/${notificationId}`)
+        const index = this.notifications.findIndex(n => n.id === notificationId)
+        if (index !== -1) {
+          const notification = this.notifications[index]
+          this.notifications.splice(index, 1)
+          // Decrement unread count if notification was unread
+          if (!notification.read && this.unreadCount > 0) {
+            this.unreadCount--
+          }
+        }
+      } catch (error) {
+        console.error('Error deleting notification:', error)
+        throw error
+      }
+    },
+
     // Poll for new notifications (call this periodically)
     async refreshNotifications() {
       await Promise.all([
