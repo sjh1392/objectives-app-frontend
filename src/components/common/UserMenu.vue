@@ -135,7 +135,9 @@ async function selectUser(user) {
     // In real auth mode, users can't switch - they're logged in as themselves
     return
   }
-  authStore.setCurrentUser(user.id, user)
+  // For non-authenticated mode (legacy), set user directly
+  // Note: This is for backward compatibility with the old user switching feature
+  authStore.setCurrentUser(user)
   notificationsStore.setCurrentUser(user.id)
   closeDropdown()
   
@@ -150,18 +152,23 @@ async function handleLogout() {
 }
 
 onMounted(() => {
-  // Load current user from localStorage
-  authStore.loadCurrentUser()
+  // Load auth state from storage (this handles both token and user)
+  // Note: loadFromStorage is called in main.js, but we call it here too for safety
+  if (!authStore.isAuthenticated) {
+    authStore.loadFromStorage()
+  }
   
-  // If no user is set but users are available, set first user as default
-  if (!authStore.currentUserId && usersStore.users.length > 0) {
+  // Only set default user if not authenticated (legacy mode)
+  // If authenticated, the user is already set from the token
+  if (!authStore.isAuthenticated && usersStore.users.length > 0) {
     selectUser(usersStore.users[0])
   }
   
   // Load users if not already loaded
   if (usersStore.users.length === 0) {
     usersStore.fetchUsers().then(() => {
-      if (!authStore.currentUserId && usersStore.users.length > 0) {
+      // Only set default user if not authenticated
+      if (!authStore.isAuthenticated && usersStore.users.length > 0) {
         selectUser(usersStore.users[0])
       }
     })

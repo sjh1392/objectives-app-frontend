@@ -67,6 +67,13 @@
             type="date"
             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
           />
+          <button
+            type="button"
+            @click="setEndOfQuarter"
+            class="mt-1 text-xs text-primary-600 hover:text-primary-800 underline"
+          >
+            End of Quarter
+          </button>
         </div>
       </div>
 
@@ -107,12 +114,12 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Team</label>
           <select
             v-model="formData.department_id"
             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
           >
-            <option value="">Select Department</option>
+            <option value="">Select Team</option>
             <option v-for="dept in departments" :key="dept.id" :value="dept.id">
               {{ dept.name }}
             </option>
@@ -163,8 +170,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useUsersStore } from '../../stores/users'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps({
   objective: {
@@ -176,19 +184,57 @@ const props = defineProps({
 const emit = defineEmits(['submit', 'cancel'])
 
 const usersStore = useUsersStore()
+const authStore = useAuthStore()
 const isEditing = computed(() => !!props.objective)
+
+// Get current user ID as default owner
+const getCurrentUserId = () => {
+  return authStore.currentUserId || authStore.currentUser?.id || ''
+}
+
+// Get current user's team/department ID
+const getCurrentUserTeamId = () => {
+  const currentUserId = getCurrentUserId()
+  if (!currentUserId) return ''
+  
+  // Find the current user in the users store to get their department/team
+  const currentUser = usersStore.getUserById(currentUserId)
+  return currentUser?.department || ''
+}
+
+function getToday() {
+  return new Date().toISOString().split('T')[0]
+}
+
+function getEndOfQuarter() {
+  const now = new Date()
+  const currentMonth = now.getMonth() // 0-11
+  const currentYear = now.getFullYear()
+  
+  // Calculate which quarter we're in (0-3)
+  const quarter = Math.floor(currentMonth / 3)
+  
+  // Calculate the last month of the current quarter
+  const lastMonthOfQuarter = (quarter + 1) * 3 - 1 // 2, 5, 8, or 11
+  
+  // Create date for last day of current quarter
+  const endOfQuarter = new Date(currentYear, lastMonthOfQuarter + 1, 0) // Day 0 = last day of previous month
+  
+  // Format as YYYY-MM-DD
+  return endOfQuarter.toISOString().split('T')[0]
+}
 
 const formData = ref({
   title: '',
   description: '',
   status: 'Active',
   priority: 'Medium',
-  start_date: '',
+  start_date: getToday(), // Default to today
   due_date: '',
-  target_value: null,
-  current_value: null,
-  owner_id: '',
-  department_id: '',
+  target_value: 100, // Default target value
+  current_value: 0, // Default current value
+  owner_id: getCurrentUserId(), // Default to current user
+  department_id: getCurrentUserTeamId(), // Default to current user's team
   tags: []
 })
 
@@ -219,16 +265,49 @@ watch(() => props.objective, (newObjective) => {
       description: '',
       status: 'Active',
       priority: 'Medium',
-      start_date: '',
+      start_date: getToday(), // Default to today
       due_date: '',
-      target_value: null,
-      current_value: null,
-      owner_id: '',
-      department_id: '',
+      target_value: 100, // Default target value
+      current_value: 0, // Default current value
+      owner_id: getCurrentUserId(), // Default to current user
+      department_id: getCurrentUserTeamId(), // Default to current user's team
       tags: []
     }
   }
 }, { immediate: true })
+
+onMounted(async () => {
+  // Ensure auth store is loaded
+  if (!authStore.currentUser) {
+    authStore.loadFromStorage()
+  }
+  
+  // Ensure users are loaded so we can get the current user's team
+  if (usersStore.users.length === 0) {
+    await usersStore.fetchUsers()
+  }
+  
+  // Set defaults if creating new objective
+  if (!isEditing.value) {
+    if (!formData.value.owner_id) {
+      formData.value.owner_id = getCurrentUserId()
+    }
+    if (!formData.value.department_id) {
+      formData.value.department_id = getCurrentUserTeamId()
+    }
+    // Ensure target and current values are set
+    if (formData.value.target_value === null || formData.value.target_value === undefined) {
+      formData.value.target_value = 100
+    }
+    if (formData.value.current_value === null || formData.value.current_value === undefined) {
+      formData.value.current_value = 0
+    }
+  }
+})
+
+function setEndOfQuarter() {
+  formData.value.due_date = getEndOfQuarter()
+}
 
 function addTag() {
   const tag = tagInput.value.trim()

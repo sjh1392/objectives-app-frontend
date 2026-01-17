@@ -8,14 +8,15 @@
         <div class="flex items-center gap-3 flex-shrink-0">
           <router-link to="/" class="flex items-center gap-3">
             <img
-              v-if="companyLogo"
-              :src="companyLogo"
+              v-if="companyStore.logoUrl"
+              :src="companyStore.logoUrl"
               alt="Company logo"
               class="h-10 max-w-[200px] object-contain"
             />
-            <h1 class="text-xl font-bold text-gray-800">
-              {{ companyName || 'Objectives' }}
+            <h1 v-if="companyStore.name" class="text-xl font-bold text-gray-800">
+              {{ companyStore.name }}
             </h1>
+            <div v-else class="h-7 w-32 bg-gray-200 rounded animate-pulse"></div>
           </router-link>
         </div>
         
@@ -60,9 +61,19 @@
         </div>
       </div>
       
-      <!-- Right side: Notifications and User Menu -->
+      <!-- Right side: Notifications, Logout, and User Menu -->
       <div class="flex items-center gap-3 flex-shrink-0">
         <NotificationBell />
+        <button
+          @click="handleLogout"
+          class="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+          title="Sign Out"
+        >
+          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span class="hidden md:inline text-sm font-medium">Sign Out</span>
+        </button>
         <UserMenu />
       </div>
     </header>
@@ -71,7 +82,8 @@
       <!-- Sidebar -->
       <aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto">
         <div class="p-6">
-          <h1 class="text-2xl font-bold text-gray-800">{{ companyName || 'Objectives' }}</h1>
+          <h1 v-if="companyStore.name" class="text-2xl font-bold text-gray-800">{{ companyStore.name }}</h1>
+          <div v-else class="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
           <p class="text-sm text-gray-500 mt-1">Management System</p>
         </div>
         <nav class="mt-8">
@@ -105,19 +117,20 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useObjectivesStore } from '../../stores/objectives'
 import { useUsersStore } from '../../stores/users'
-import api from '../../services/api'
+import { useAuthStore } from '../../stores/auth'
+import { useCompanyStore } from '../../stores/company'
 
 const router = useRouter()
 const route = useRoute()
 const objectivesStore = useObjectivesStore()
 const usersStore = useUsersStore()
+const authStore = useAuthStore()
+const companyStore = useCompanyStore()
 
 const searchInput = ref(null)
 const searchQuery = ref('')
 const showSearchResults = ref(false)
 const searchResults = ref([])
-const companyLogo = ref(null)
-const companyName = ref(null)
 let searchTimeout = null
 let searchAbortController = null // For cancelling in-flight requests
 
@@ -276,6 +289,11 @@ function closeSearch() {
   searchInput.value?.blur()
 }
 
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
+
 function handleKeyDown(event) {
   // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
   if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
@@ -291,32 +309,28 @@ function handleKeyDown(event) {
 }
 
 async function loadCompanyData() {
-  try {
-    const response = await api.get('/company')
-    if (response.data) {
-      if (response.data.logo_url) {
-        companyLogo.value = response.data.logo_url
-      }
-      if (response.data.name) {
-        companyName.value = response.data.name
-        // Update page title
-        document.title = `${response.data.name} - Objectives Management`
-      } else {
-        document.title = 'Objectives Management'
-      }
-    } else {
-      document.title = 'Objectives Management'
-    }
-  } catch (error) {
-    console.error('Error loading company data:', error)
-    document.title = 'Objectives Management'
+  // Only fetch if we don't have data in store
+  if (!companyStore.hasCompanyData) {
+    await companyStore.fetchCompanyData()
   }
 }
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyDown)
+  
+  // Load company data from storage first (instant, no flash)
+  companyStore.loadFromStorage()
+  
+  // Then fetch fresh data in background (only if not already loaded)
+  loadCompanyData()
+  
   // Reload company data when window regains focus (in case it was updated in another tab/window)
-  window.addEventListener('focus', loadCompanyData)
+  window.addEventListener('focus', () => {
+    // Only fetch if we don't have data, or do a background refresh
+    if (!companyStore.hasCompanyData) {
+      loadCompanyData()
+    }
+  })
   
   // Only load users if not already loaded (to avoid blocking)
   if (usersStore.users.length === 0) {
@@ -326,14 +340,12 @@ onMounted(() => {
   if (usersStore.departments.length === 0) {
     usersStore.fetchDepartments().catch(err => console.error('Error loading departments:', err))
   }
-  // Load company data (logo and name)
-  loadCompanyData()
   
   // Reload company data when route changes (especially after onboarding updates)
   watch(() => route.path, (newPath, oldPath) => {
     // Reload if navigating away from onboarding (company might have been updated)
     if (oldPath === '/onboarding' && newPath !== '/onboarding') {
-      loadCompanyData()
+      companyStore.fetchCompanyData()
     }
   })
 })

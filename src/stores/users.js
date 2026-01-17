@@ -4,7 +4,8 @@ import api from '../services/api'
 export const useUsersStore = defineStore('users', {
   state: () => ({
     users: [],
-    departments: [],
+    departments: [], // Also used for teams (backward compatibility)
+    teams: [], // Alias for departments
     loading: false
   }),
 
@@ -99,10 +100,26 @@ export const useUsersStore = defineStore('users', {
       try {
         const response = await api.get('/departments')
         this.departments = response.data
+        this.teams = response.data // Also populate teams for backward compatibility
         return response.data
       } catch (error) {
         console.error('Error fetching departments:', error)
         throw error
+      }
+    },
+
+    async fetchTeams() {
+      // Try /teams first, fallback to /departments for backward compatibility
+      try {
+        const response = await api.get('/teams')
+        this.departments = response.data // Store in departments array for backward compatibility
+        this.teams = response.data // Also store in teams array
+        return response.data
+      } catch (error) {
+        // Fallback to departments endpoint
+        const result = await this.fetchDepartments()
+        this.teams = result // Also populate teams
+        return result
       }
     },
 

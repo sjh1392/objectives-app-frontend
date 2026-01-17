@@ -14,6 +14,33 @@
           </div>
           <div class="flex gap-2">
             <button
+              @click="toggleSubscription"
+              :disabled="subscriptionLoading"
+              class="px-4 py-2 border rounded-md transition-colors flex items-center gap-2"
+              :class="isSubscribed 
+                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' 
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'"
+            >
+              <svg 
+                v-if="isSubscribed"
+                class="w-5 h-5" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+              >
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg 
+                v-else
+                class="w-5 h-5" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              <span>{{ isSubscribed ? 'Subscribed' : 'Subscribe' }}</span>
+            </button>
+            <button
               @click="editObjective"
               class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
@@ -101,18 +128,18 @@
               <button
                 @click="keyResultViewMode = 'kanban'"
                 :class="keyResultViewMode === 'kanban' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'"
-                class="px-4 py-2 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
+                class="px-4 py-2 text-sm font-medium hover:bg-gray-50"
                 title="Kanban View"
               >
-                <span>📋</span> Kanban
+                Kanban
               </button>
               <button
                 @click="keyResultViewMode = 'list'"
                 :class="keyResultViewMode === 'list' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'"
-                class="px-4 py-2 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
+                class="px-4 py-2 text-sm font-medium hover:bg-gray-50"
                 title="List View"
               >
-                <span>📝</span> List
+                List
               </button>
             </div>
             <!-- Auto-update toggle (only show in kanban view) -->
@@ -124,12 +151,6 @@
               />
               <span>Auto-update progress on move</span>
             </label>
-            <button
-              @click="showKeyResultForm = true; editingKeyResult = null"
-              class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm"
-            >
-              + Add Key Result
-            </button>
           </div>
         </div>
 
@@ -138,11 +159,16 @@
           <div
             v-for="column in kanbanColumns"
             :key="column.status"
-            class="bg-gray-50 rounded-lg p-4 min-h-[400px]"
+            :class="[
+              'rounded-lg p-4 min-h-[400px] transition-all duration-200',
+              draggedOverColumn === column.status 
+                ? 'bg-primary-100 border-2 border-primary-500 border-dashed' 
+                : 'bg-gray-50 border-2 border-transparent'
+            ]"
             @drop="handleDrop(column.status, $event)"
-            @dragover.prevent
-            @dragenter.prevent
-            @dragleave.prevent
+            @dragover.prevent="handleDragOver(column.status)"
+            @dragenter.prevent="handleDragEnter(column.status)"
+            @dragleave.prevent="handleDragLeave(column.status)"
           >
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-semibold text-gray-700">{{ column.label }}</h3>
@@ -158,7 +184,16 @@
                 @drag-start="handleDragStart"
                 @drag-end="handleDragEnd"
               />
-              <div v-if="getKeyResultsByStatus(column.status).length === 0" class="text-center py-8 text-gray-400 text-sm">
+              <!-- Add Key Result button in To Do column -->
+              <div v-if="column.status === 'Not Started'" class="mt-3">
+                <button
+                  @click="showKeyResultForm = true; editingKeyResult = null"
+                  class="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm transition-colors"
+                >
+                  + Add Key Result
+                </button>
+              </div>
+              <div v-if="getKeyResultsByStatus(column.status).length === 0 && column.status !== 'Not Started'" class="text-center py-8 text-gray-400 text-sm">
                 No key results
               </div>
             </div>
@@ -466,6 +501,7 @@ const route = useRoute()
 const router = useRouter()
 const objectivesStore = useObjectivesStore()
 const usersStore = useUsersStore()
+const authStore = useAuthStore()
 
 const objective = computed(() => objectivesStore.currentObjective)
 const showEditForm = ref(false)
@@ -474,11 +510,14 @@ const keyResultViewMode = ref('kanban')
 const showKeyResultForm = ref(false)
 const editingKeyResult = ref(null)
 const draggedKeyResult = ref(null)
+const draggedOverColumn = ref(null)
 const autoUpdateProgressOnKanbanMove = ref(true)
 const showAddContributor = ref(false)
 const showManageContributors = ref(false)
 const selectedContributorId = ref(null)
 const comments = ref([])
+const isSubscribed = ref(false)
+const subscriptionLoading = ref(false)
 const progressUpdates = ref([])
 const updateForm = ref({
   current_value: null,
@@ -581,7 +620,8 @@ onMounted(async () => {
       loadObjective().catch(err => console.error('Failed to load objective:', err)),
       loadKeyResults().catch(err => console.error('Failed to load key results:', err)),
       loadComments().catch(err => console.error('Failed to load comments:', err)),
-      loadProgressUpdates().catch(err => console.error('Failed to load progress updates:', err))
+      loadProgressUpdates().catch(err => console.error('Failed to load progress updates:', err)),
+      checkSubscriptionStatus().catch(err => console.error('Failed to check subscription:', err))
     ])
     
     document.addEventListener('click', handleClickOutside)
@@ -798,7 +838,6 @@ async function submitUpdate() {
   const commentText = updateForm.value.comment.trim()
   const currentValue = updateForm.value.current_value
   // Get current user from auth store
-  const authStore = useAuthStore()
   const currentUserId = authStore.currentUserId || usersStore.users[0]?.id || null
   
   // Store original state for potential rollback
@@ -993,9 +1032,33 @@ function handleDragStart({ keyResult }) {
 }
 
 function handleDragEnd() {
+  // Clear drag-over highlighting
+  draggedOverColumn.value = null
   // Only clear if drop was successful (handled by handleDrop)
   // If drop failed or was cancelled, handleDrop will reset draggedKeyResult
   // This prevents clearing state prematurely
+}
+
+function handleDragEnter(status) {
+  if (draggedKeyResult.value) {
+    draggedOverColumn.value = status
+  }
+}
+
+function handleDragOver(status) {
+  if (draggedKeyResult.value) {
+    draggedOverColumn.value = status
+  }
+}
+
+function handleDragLeave(status) {
+  // Only clear if we're actually leaving (not just moving to a child element)
+  // Use a small timeout to debounce rapid enter/leave events
+  setTimeout(() => {
+    if (draggedOverColumn.value === status) {
+      draggedOverColumn.value = null
+    }
+  }, 50)
 }
 
 function getProgressForStatus(status) {
@@ -1038,9 +1101,11 @@ async function handleDrop(newStatus, event) {
       updateData.current_value = currentValue
     }
 
-    // Optimistically update the UI immediately
-    const keyResultIndex = keyResults.value.findIndex(kr => kr.id === draggedKeyResult.value.id)
+    // Optimistically update the UI immediately - this makes it feel instant
+    const keyResultId = draggedKeyResult.value.id
+    const keyResultIndex = keyResults.value.findIndex(kr => kr.id === keyResultId)
     if (keyResultIndex !== -1) {
+      // Update the key result immediately in the UI
       keyResults.value[keyResultIndex] = {
         ...keyResults.value[keyResultIndex],
         status: newStatus,
@@ -1057,7 +1122,7 @@ async function handleDrop(newStatus, event) {
       const allKeyResults = keyResults.value
       const totalProgress = allKeyResults.reduce((sum, kr) => {
         // Use updated progress for the moved key result
-        const krProgress = kr.id === draggedKeyResult.value.id 
+        const krProgress = kr.id === keyResultId 
           ? updateData.progress_percentage 
           : (kr.progress_percentage || 0)
         return sum + krProgress
@@ -1066,7 +1131,7 @@ async function handleDrop(newStatus, event) {
       const targetValue = objective.value.target_value || 100
       const currentValue = (averageProgress / 100) * targetValue
       
-      // Update local objective state
+      // Update local objective state immediately
       objectivesStore.currentObjective = {
         ...objective.value,
         progress_percentage: averageProgress,
@@ -1074,29 +1139,37 @@ async function handleDrop(newStatus, event) {
       }
     }
 
-    // Send update to server in the background
-    await api.put(`/key-results/${draggedKeyResult.value.id}`, updateData)
-    
-    // Silently refresh data in the background without blocking UI
-    Promise.all([
-      loadKeyResults(),
-      loadObjective(),
-      loadProgressUpdates()
-    ]).catch(err => {
-      console.error('Background refresh failed:', err)
-      // If refresh fails, revert optimistic update
-      if (keyResultIndex !== -1) {
-        keyResults.value[keyResultIndex] = originalKeyResult
-      }
-      if (objective.value) {
-        objectivesStore.currentObjective = originalObjective
-      }
-    })
-    
+    // Clear the dragged state immediately for smooth UX
     draggedKeyResult.value = null
+    draggedOverColumn.value = null
+
+    // Save to server asynchronously in the background (non-blocking)
+    // Don't await - let it happen in the background without blocking UI
+    api.put(`/key-results/${keyResultId}`, updateData)
+      .then(() => {
+        // Success - data is already updated optimistically, no refresh needed
+        // Optionally sync progress updates in background without UI refresh
+        loadProgressUpdates().catch(err => console.error('Failed to sync progress updates:', err))
+      })
+      .catch(err => {
+        console.error('Error saving to server:', err)
+        // Revert optimistic update on error
+        if (keyResultIndex !== -1) {
+          keyResults.value[keyResultIndex] = originalKeyResult
+        }
+        if (objective.value) {
+          objectivesStore.currentObjective = originalObjective
+        }
+        // Show user-friendly error but don't revert the drag visually
+        const errorMsg = err.response?.data?.error || err.message || 'Failed to save. Changes will revert.'
+        console.error('Error updating key result status:', errorMsg)
+        // Optionally show a toast notification instead of alert for better UX
+        alert(`Failed to save: ${errorMsg}`)
+      })
   } catch (error) {
-    console.error('Error updating key result status:', error)
-    console.error('Error details:', error.response?.data)
+    // This catch block should rarely be hit since we're not awaiting the API call
+    // But handle it just in case
+    console.error('Error in handleDrop:', error)
     
     // Revert optimistic update on error
     const keyResultIndex = keyResults.value.findIndex(kr => kr.id === originalKeyResult.id)
@@ -1109,6 +1182,7 @@ async function handleDrop(newStatus, event) {
     
     // Reset dragged state on error
     draggedKeyResult.value = null
+    draggedOverColumn.value = null
     
     // Show user-friendly error message
     const errorMsg = error.message || 'Network error - please check if the backend server is running'
@@ -1281,6 +1355,48 @@ async function removeContributor(userId) {
   } catch (error) {
     console.error('Error removing contributor:', error)
     alert('Error removing contributor. Please try again.')
+  }
+}
+
+async function checkSubscriptionStatus() {
+  if (!authStore.isAuthenticated) {
+    isSubscribed.value = false
+    return
+  }
+  
+  try {
+    const response = await api.get(`/objectives/${route.params.id}/subscribe`)
+    isSubscribed.value = response.data.subscribed || false
+  } catch (error) {
+    console.error('Error checking subscription status:', error)
+    isSubscribed.value = false
+  }
+}
+
+async function toggleSubscription() {
+  if (!authStore.isAuthenticated) {
+    alert('Please log in to subscribe to objectives')
+    router.push('/login')
+    return
+  }
+  
+  subscriptionLoading.value = true
+  
+  try {
+    if (isSubscribed.value) {
+      // Unsubscribe
+      await api.delete(`/objectives/${route.params.id}/subscribe`)
+      isSubscribed.value = false
+    } else {
+      // Subscribe
+      await api.post(`/objectives/${route.params.id}/subscribe`)
+      isSubscribed.value = true
+    }
+  } catch (error) {
+    console.error('Error toggling subscription:', error)
+    alert(error.response?.data?.error || 'Error updating subscription. Please try again.')
+  } finally {
+    subscriptionLoading.value = false
   }
 }
 </script>

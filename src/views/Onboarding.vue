@@ -61,8 +61,8 @@
 import { ref, computed, onMounted } from 'vue'
 import AppLayout from '../components/layout/AppLayout.vue'
 import OnboardingStepCompany from '../components/onboarding/OnboardingStepCompany.vue'
-import OnboardingStepDepartments from '../components/onboarding/OnboardingStepDepartments.vue'
 import OnboardingStepTeam from '../components/onboarding/OnboardingStepTeam.vue'
+import OnboardingStepTeams from '../components/onboarding/OnboardingStepTeams.vue'
 import OnboardingStepObjectives from '../components/onboarding/OnboardingStepObjectives.vue'
 import OnboardingStepKeyResults from '../components/onboarding/OnboardingStepKeyResults.vue'
 import api from '../services/api'
@@ -71,8 +71,8 @@ const currentStep = ref(0)
 
 const steps = ref([
   { id: 'company', label: 'Company Info', component: OnboardingStepCompany, completed: false },
-  { id: 'departments', label: 'Departments', component: OnboardingStepDepartments, completed: false },
   { id: 'team', label: 'Team Members', component: OnboardingStepTeam, completed: false },
+  { id: 'teams', label: 'Teams', component: OnboardingStepTeams, completed: false },
   { id: 'objectives', label: 'Objectives', component: OnboardingStepObjectives, completed: false },
   { id: 'key-results', label: 'Key Results', component: OnboardingStepKeyResults, completed: false }
 ])
@@ -88,15 +88,15 @@ async function checkStepCompletion() {
       steps.value[0].completed = true
     }
 
-    // Check departments
-    const deptsRes = await api.get('/departments')
-    if (deptsRes.data && deptsRes.data.length > 0) {
-      steps.value[1].completed = true
-    }
-
     // Check team members
     const usersRes = await api.get('/users')
     if (usersRes.data && usersRes.data.length > 0) {
+      steps.value[1].completed = true
+    }
+
+    // Check teams (formerly departments)
+    const teamsRes = await api.get('/teams')
+    if (teamsRes.data && teamsRes.data.length > 0) {
       steps.value[2].completed = true
     }
 

@@ -104,8 +104,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../../services/api'
+import { useCompanyStore } from '../../stores/company'
 
 const emit = defineEmits(['step-complete', 'data-updated'])
+const companyStore = useCompanyStore()
 
 const formData = ref({
   name: '',
@@ -124,6 +126,18 @@ const errorMessage = ref('')
 
 async function loadCompanyData() {
   try {
+    // Try to load from store first
+    if (companyStore.name) {
+      formData.value = {
+        name: companyStore.name || '',
+        description: ''
+      }
+      if (companyStore.logoUrl) {
+        currentLogoUrl.value = companyStore.logoUrl
+      }
+    }
+    
+    // Then fetch fresh data
     const response = await api.get('/company')
     if (response.data) {
       formData.value = {
@@ -133,6 +147,8 @@ async function loadCompanyData() {
       if (response.data.logo_url) {
         currentLogoUrl.value = response.data.logo_url
       }
+      // Update store with fresh data
+      companyStore.setCompanyData(response.data)
     }
   } catch (error) {
     console.error('Error loading company data:', error)
@@ -212,20 +228,21 @@ async function handleSubmit() {
     }
     
     // Then save/update company info
-    await api.post('/company', {
+    const response = await api.post('/company', {
       name: formData.value.name,
       description: formData.value.description,
+      logo_url: logoUrl
+    })
+    
+    // Update the store immediately
+    companyStore.setCompanyData({
+      name: formData.value.name,
       logo_url: logoUrl
     })
     
     successMessage.value = 'Company information saved successfully!'
     emit('step-complete', 'company')
     emit('data-updated')
-    
-    // Update page title immediately
-    if (formData.value.name) {
-      document.title = `${formData.value.name} - Objectives Management`
-    }
     
     // Clear file selection after successful upload
     selectedFile.value = null

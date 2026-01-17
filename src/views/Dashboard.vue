@@ -28,38 +28,54 @@
       </div>
 
       <!-- Manager Actions -->
-      <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Manager Actions</h2>
+      <div 
+        class="bg-white rounded-lg shadow-md mb-8 transition-all"
+        :class="hasNoActions ? 'p-4' : 'p-6'"
+      >
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold text-gray-900">Manager Actions</h2>
+          <span 
+            v-if="managerActions && !hasNoActions"
+            class="text-xs font-medium px-2 py-1 rounded-full"
+            :class="{
+              'bg-red-100 text-red-700': (managerActions.pastDue?.length || 0) > 0,
+              'bg-yellow-100 text-yellow-700': (managerActions.pastDue?.length || 0) === 0 && (managerActions.noUpdates?.length || 0) > 0,
+              'bg-green-100 text-green-700': hasNoActions
+            }"
+          >
+            {{ (managerActions.pastDue?.length || 0) + (managerActions.noUpdates?.length || 0) }} items
+          </span>
+        </div>
         
-        <!-- Celebratory Message when no actions needed -->
-        <div v-if="managerActions && hasNoActions" class="text-center py-12">
-          <div class="text-6xl mb-4">🎉</div>
-          <h3 class="text-2xl font-bold text-green-600 mb-2">Excellent Work!</h3>
-          <p class="text-lg text-gray-600 mb-1">All objectives are up to date and on track.</p>
-          <p class="text-sm text-gray-500">No action items required at this time.</p>
+        <!-- Compact "No Actions" State -->
+        <div v-if="managerActions && hasNoActions" class="flex items-center gap-3 text-sm text-gray-600">
+          <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>All objectives are up to date. No action items required.</span>
         </div>
 
         <!-- Objectives Without Updates -->
-        <div v-else-if="managerActions" class="mb-6">
-          <h3 class="text-lg font-medium text-gray-700 mb-3">
-            Objectives Without Recent Updates ({{ managerActions.noUpdates?.length || 0 }})
+        <div v-else-if="managerActions && managerActions.noUpdates && managerActions.noUpdates.length > 0" class="mb-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">
+            Needs Update ({{ managerActions.noUpdates.length }})
           </h3>
-          <div v-if="managerActions.noUpdates && managerActions.noUpdates.length > 0" class="space-y-2">
+          <div class="space-y-1.5">
             <router-link
               v-for="objective in managerActions.noUpdates"
               :key="objective.id"
               :to="`/objectives/${objective.id}`"
-              class="block p-3 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+              class="block p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
             >
-              <div class="flex justify-between items-start">
-                <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ objective.title }}</div>
-                  <div class="text-sm text-gray-500 mt-1">
-                    Last updated: {{ formatDateTime(objective.updated_at) }}
+              <div class="flex justify-between items-center">
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-gray-900 truncate">{{ objective.title }}</div>
+                  <div class="text-xs text-gray-500 mt-0.5">
+                    Updated {{ formatDateTime(objective.updated_at) }}
                   </div>
                 </div>
                 <span
-                  class="ml-3 px-2 py-1 rounded-full text-xs font-semibold"
+                  class="ml-2 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
                   :class="{
                     'bg-green-100 text-green-800': objective.status === 'Active',
                     'bg-yellow-100 text-yellow-800': objective.status === 'On Hold',
@@ -70,33 +86,30 @@
                 </span>
               </div>
             </router-link>
-          </div>
-          <div v-else class="text-sm text-gray-500 italic py-2">
-            All objectives have recent updates.
           </div>
         </div>
 
         <!-- Past Due Objectives -->
-        <div v-if="managerActions">
-          <h3 class="text-lg font-medium text-red-700 mb-3">
-            Past Due Objectives ({{ managerActions.pastDue?.length || 0 }})
+        <div v-if="managerActions && managerActions.pastDue && managerActions.pastDue.length > 0">
+          <h3 class="text-sm font-medium text-red-700 mb-2">
+            Past Due ({{ managerActions.pastDue.length }})
           </h3>
-          <div v-if="managerActions.pastDue && managerActions.pastDue.length > 0" class="space-y-2">
+          <div class="space-y-1.5">
             <router-link
               v-for="objective in managerActions.pastDue"
               :key="objective.id"
               :to="`/objectives/${objective.id}`"
-              class="block p-3 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+              class="block p-2 border border-red-200 rounded hover:bg-red-50 transition-colors"
             >
-              <div class="flex justify-between items-start">
-                <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ objective.title }}</div>
-                  <div class="text-sm text-red-600 mt-1">
-                    Due date: {{ formatDate(objective.due_date) }}
+              <div class="flex justify-between items-center">
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-gray-900 truncate">{{ objective.title }}</div>
+                  <div class="text-xs text-red-600 mt-0.5">
+                    Due {{ formatDate(objective.due_date) }}
                   </div>
                 </div>
                 <span
-                  class="ml-3 px-2 py-1 rounded-full text-xs font-semibold"
+                  class="ml-2 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
                   :class="{
                     'bg-green-100 text-green-800': objective.status === 'Active',
                     'bg-yellow-100 text-yellow-800': objective.status === 'On Hold',
@@ -107,9 +120,6 @@
                 </span>
               </div>
             </router-link>
-          </div>
-          <div v-else class="text-sm text-gray-500 italic py-2">
-            No past due objectives.
           </div>
         </div>
       </div>
@@ -137,24 +147,25 @@
         </div>
 
         <!-- Table View -->
-        <div v-if="viewMode === 'table'" class="bg-white rounded-lg shadow-md overflow-hidden">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr
-                v-for="objective in objectivesStore.objectives"
-                :key="objective.id"
-                @click="router.push(`/objectives/${objective.id}`)"
-                class="cursor-pointer hover:bg-gray-50"
-              >
+        <div v-if="viewMode === 'table'">
+          <div v-if="subscribedObjectives.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr
+                  v-for="objective in subscribedObjectives"
+                  :key="objective.id"
+                  @click="router.push(`/objectives/${objective.id}`)"
+                  class="cursor-pointer hover:bg-gray-50"
+                >
                 <td class="px-6 py-4">
                   <div class="text-sm font-medium text-gray-900">{{ objective.title }}</div>
                   <div class="text-sm text-gray-500 line-clamp-1">{{ objective.description }}</div>
@@ -212,15 +223,28 @@
               </tr>
             </tbody>
           </table>
+          </div>
+          
+          <!-- Empty State for Table View -->
+          <div v-else class="text-center py-12 bg-white rounded-lg shadow-md">
+            <p class="text-gray-500 text-lg">You haven't subscribed to any objectives yet.</p>
+            <p class="text-gray-400 text-sm mt-2">Subscribe to objectives from the Objectives page to see them here.</p>
+          </div>
         </div>
 
         <!-- Grid View -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else-if="subscribedObjectives.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <ObjectiveCard
-            v-for="objective in objectivesStore.objectives"
+            v-for="objective in subscribedObjectives"
             :key="objective.id"
             :objective="objective"
           />
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="text-center py-12 bg-white rounded-lg shadow-md">
+          <p class="text-gray-500 text-lg">You haven't subscribed to any objectives yet.</p>
+          <p class="text-gray-400 text-sm mt-2">Subscribe to objectives from the Objectives page to see them here.</p>
         </div>
       </div>
 
@@ -247,6 +271,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useObjectivesStore } from '../stores/objectives'
 import { useUsersStore } from '../stores/users'
+import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/layout/AppLayout.vue'
 import ObjectiveCard from '../components/objectives/ObjectiveCard.vue'
 import Avatar from '../components/common/Avatar.vue'
@@ -255,8 +280,10 @@ import api from '../services/api'
 const router = useRouter()
 const objectivesStore = useObjectivesStore()
 const usersStore = useUsersStore()
+const authStore = useAuthStore()
 const viewMode = ref('table')
 const managerActions = ref(null)
+const subscribedObjectives = ref([])
 
 const hasNoActions = computed(() => {
   if (!managerActions.value) return false
@@ -265,10 +292,47 @@ const hasNoActions = computed(() => {
   return noUpdates === 0 && pastDue === 0
 })
 
+async function loadSubscribedObjectives() {
+  try {
+    console.log('Loading subscribed objectives for user:', authStore.currentUserId)
+    const response = await api.get('/objectives/subscribed')
+    console.log('Subscribed objectives response:', response)
+    console.log('Response data:', response.data)
+    console.log('Response data type:', typeof response.data)
+    console.log('Response data length:', response.data?.length)
+    
+    // Ensure we're handling both array and object responses
+    const objectives = Array.isArray(response.data) ? response.data : (response.data?.objectives || [])
+    subscribedObjectives.value = objectives
+    // Also update the store for stats and other purposes
+    objectivesStore.objectives = objectives
+    console.log('Loaded', subscribedObjectives.value.length, 'subscribed objectives')
+  } catch (error) {
+    console.error('Error loading subscribed objectives:', error)
+    console.error('Error response:', error.response)
+    console.error('Error status:', error.response?.status)
+    console.error('Error data:', error.response?.data)
+    console.error('Error message:', error.message)
+    subscribedObjectives.value = []
+    // Show user-friendly error
+    if (error.response?.status === 404) {
+      console.warn('Subscribed objectives endpoint not found - falling back to all objectives')
+      // Fallback: load all objectives if endpoint doesn't exist yet
+      await objectivesStore.fetchObjectives()
+      subscribedObjectives.value = objectivesStore.objectives
+    }
+  }
+}
+
 onMounted(async () => {
+  // Ensure auth store is loaded
+  if (!authStore.currentUser) {
+    authStore.loadFromStorage()
+  }
+  
   await usersStore.fetchUsers()
-  await objectivesStore.fetchObjectives()
-  await objectivesStore.fetchStats()
+  await loadSubscribedObjectives() // Load only subscribed objectives
+  await objectivesStore.fetchStats() // Stats might need all objectives, but we'll use subscribed for display
   await objectivesStore.fetchTags()
   await loadManagerActions()
 })

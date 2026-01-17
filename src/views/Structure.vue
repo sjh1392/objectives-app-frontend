@@ -56,10 +56,10 @@
           </div>
         </div>
 
-        <!-- Departments -->
+        <!-- Teams -->
         <div v-for="department in usersStore.departments" :key="department.id" class="mb-8">
           <div class="bg-white rounded-lg shadow-md p-6">
-            <!-- Department Header -->
+            <!-- Team Header -->
             <div class="flex items-start justify-between mb-6 pb-4 border-b">
               <div class="flex-1">
                 <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ department.name }}</h2>
@@ -74,7 +74,7 @@
               </div>
             </div>
 
-            <!-- Department Members -->
+            <!-- Team Members -->
             <div v-if="getDepartmentMembers(department.id).length > 0">
               <h3 class="text-sm font-medium text-gray-700 mb-4">
                 Team Members ({{ getDepartmentMembers(department.id).length }})
@@ -114,10 +114,10 @@
               <p>No members assigned to this department</p>
             </div>
 
-            <!-- Department Objectives -->
+            <!-- Team Objectives -->
             <div v-if="getDepartmentObjectives(department.id).length > 0" class="mt-6 pt-6 border-t">
               <h3 class="text-sm font-medium text-gray-700 mb-4">
-                Department Objectives ({{ getDepartmentObjectives(department.id).length }})
+                Team Objectives ({{ getDepartmentObjectives(department.id).length }})
               </h3>
               <div class="space-y-2">
                 <router-link
@@ -151,7 +151,7 @@
               </div>
             </div>
             <div v-else class="mt-6 pt-6 border-t">
-              <p class="text-sm text-gray-400 italic">No objectives assigned to this department</p>
+              <p class="text-sm text-gray-400 italic">No objectives assigned to this team</p>
             </div>
           </div>
         </div>
@@ -185,9 +185,9 @@
             </div>
           </div>
 
-          <!-- Departments Tree -->
+          <!-- Teams Tree -->
           <div v-for="department in usersStore.departments" :key="department.id" class="border-l-4 border-primary-500 pl-6">
-            <!-- Department Node -->
+            <!-- Team Node -->
             <div class="mb-4">
               <div class="flex items-center gap-3 mb-2">
                 <div class="w-4 h-4 bg-primary-500 rounded-full"></div>
@@ -231,7 +231,7 @@
               No members assigned
             </div>
 
-            <!-- Department Objectives in Tree View -->
+            <!-- Team Objectives in Tree View -->
             <div v-if="getDepartmentObjectives(department.id).length > 0" class="ml-8 mt-4 pl-4 border-l-2 border-primary-300">
               <div class="mb-2">
                 <span class="text-sm font-medium text-gray-700">
@@ -268,7 +268,7 @@
               </div>
             </div>
             <div v-else class="ml-8 mt-4 text-sm text-gray-400 italic py-2">
-              No objectives assigned to this department
+              No objectives assigned to this team
             </div>
           </div>
 
