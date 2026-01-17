@@ -20,45 +20,17 @@
           </router-link>
         </div>
         
-        <!-- Search -->
-        <div class="flex-1 max-w-2xl relative">
-          <div class="relative">
-            <input
-              ref="searchInput"
-              v-model="searchQuery"
-              @input="handleSearch"
-              @keydown.escape="closeSearch"
-              type="text"
-              placeholder="Search objectives, departments, or users... (⌘K)"
-              class="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
+        <!-- Search Trigger Button -->
+        <button
+          @click="openCommandPalette"
+          class="flex-1 max-w-2xl px-4 py-2 pl-10 border border-gray-300 rounded-lg text-left text-gray-500 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 relative"
+        >
+          <span>Search objectives, departments, or users...</span>
+          <div class="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 text-xs text-gray-400">
+            <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded">⌘</kbd>
+            <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded">K</kbd>
           </div>
-          
-          <!-- Search Results Dropdown -->
-          <div v-if="showSearchResults && searchResults.length > 0" class="absolute z-50 mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-            <div
-              v-for="result in searchResults"
-              :key="result.id"
-              @click="handleResultClick(result)"
-              class="px-4 py-3 cursor-pointer hover:bg-purple-50 border-b border-gray-100 last:border-0"
-            >
-              <div class="flex items-center gap-3">
-                <span class="text-gray-400" v-html="getResultIcon(result.type)"></span>
-                <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ result.title }}</div>
-                  <div class="text-sm text-gray-500">{{ result.subtitle }}</div>
-                </div>
-                <span class="text-xs text-gray-400 uppercase">{{ result.type }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-if="showSearchResults && searchQuery && searchResults.length === 0" class="absolute z-50 mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-sm text-gray-500 text-center">
-            No results found
-          </div>
-        </div>
+        </button>
       </div>
       
       <!-- Right side: Notifications, Logout, and User Menu -->
@@ -107,12 +79,16 @@
         </div>
       </main>
     </div>
+    
+    <!-- Command Palette -->
+    <CommandPalette ref="commandPaletteRef" />
   </div>
 </template>
 
 <script setup>
 import NotificationBell from '@/components/common/NotificationBell.vue'
 import UserMenu from '@/components/common/UserMenu.vue'
+import CommandPalette from '@/components/common/CommandPalette.vue'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useObjectivesStore } from '../../stores/objectives'
@@ -127,12 +103,7 @@ const usersStore = useUsersStore()
 const authStore = useAuthStore()
 const companyStore = useCompanyStore()
 
-const searchInput = ref(null)
-const searchQuery = ref('')
-const showSearchResults = ref(false)
-const searchResults = ref([])
-let searchTimeout = null
-let searchAbortController = null // For cancelling in-flight requests
+const commandPaletteRef = ref(null)
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'grid' },
@@ -159,134 +130,10 @@ function getIcon(iconName) {
   return icons[iconName] || ''
 }
 
-function getResultIcon(type) {
-  const icons = {
-    objective: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-    user: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
-    department: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>'
+function openCommandPalette() {
+  if (commandPaletteRef.value) {
+    commandPaletteRef.value.open()
   }
-  return icons[type] || ''
-}
-
-async function handleSearch() {
-  // Cancel any in-flight search requests
-  if (searchAbortController) {
-    searchAbortController.abort()
-  }
-  
-  // Clear existing timeout
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-
-  if (!searchQuery.value.trim()) {
-    showSearchResults.value = false
-    searchResults.value = []
-    return
-  }
-
-  // Debounce search - wait 300ms after user stops typing
-  searchTimeout = setTimeout(async () => {
-    const query = searchQuery.value.toLowerCase().trim()
-    if (!query) return
-
-    // Create new abort controller for this search
-    searchAbortController = new AbortController()
-    const signal = searchAbortController.signal
-
-    const results = []
-
-    try {
-      // Search objectives (only if query is at least 2 characters)
-      if (query.length >= 2) {
-        const objectivesResponse = await api.get('/objectives', { 
-          params: { search: searchQuery.value },
-          signal // Allow request cancellation
-        })
-        objectivesResponse.data.slice(0, 5).forEach(obj => {
-          results.push({
-            id: obj.id,
-            type: 'objective',
-            title: obj.title,
-            subtitle: obj.description || `Status: ${obj.status}`,
-            path: `/objectives/${obj.id}`
-          })
-        })
-      }
-
-      // Search users (client-side filter from already loaded users)
-      if (usersStore.users.length > 0) {
-        const users = usersStore.users.filter(user => 
-          user.name.toLowerCase().includes(query) || 
-          user.email.toLowerCase().includes(query)
-        ).slice(0, 3)
-        users.forEach(user => {
-          results.push({
-            id: user.id,
-            type: 'user',
-            title: user.name,
-            subtitle: user.email,
-            path: `/people/${user.id}`
-          })
-        })
-      }
-
-      // Search departments (client-side if already loaded, otherwise API call)
-      if (usersStore.departments && usersStore.departments.length > 0) {
-        const filteredDepts = usersStore.departments.filter(dept => 
-          dept.name.toLowerCase().includes(query) ||
-          (dept.description && dept.description.toLowerCase().includes(query))
-        ).slice(0, 2)
-        filteredDepts.forEach(dept => {
-          results.push({
-            id: dept.id,
-            type: 'department',
-            title: dept.name,
-            subtitle: dept.description || 'Department',
-            path: `/departments`
-          })
-        })
-      } else if (query.length >= 2) {
-        // Only fetch departments if not already loaded and query is long enough
-        const departmentsResponse = await api.get('/departments', { signal })
-        const filteredDepts = departmentsResponse.data.filter(dept => 
-          dept.name.toLowerCase().includes(query) ||
-          (dept.description && dept.description.toLowerCase().includes(query))
-        ).slice(0, 2)
-        filteredDepts.forEach(dept => {
-          results.push({
-            id: dept.id,
-            type: 'department',
-            title: dept.name,
-            subtitle: dept.description || 'Department',
-            path: `/departments`
-          })
-        })
-      }
-
-      searchResults.value = results.slice(0, 10) // Limit to 10 results
-      showSearchResults.value = true
-    } catch (error) {
-      // Don't log aborted requests (they're cancelled intentionally)
-      if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
-        console.error('Error searching:', error)
-      }
-    } finally {
-      searchAbortController = null
-    }
-  }, 300) // 300ms debounce
-}
-
-function handleResultClick(result) {
-  router.push(result.path)
-  closeSearch()
-}
-
-function closeSearch() {
-  searchQuery.value = ''
-  showSearchResults.value = false
-  searchResults.value = []
-  searchInput.value?.blur()
 }
 
 async function handleLogout() {
@@ -295,17 +142,8 @@ async function handleLogout() {
 }
 
 function handleKeyDown(event) {
-  // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
-  if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-    event.preventDefault()
-    searchInput.value?.focus()
-    searchInput.value?.select()
-  }
-  
-  // Escape to close search
-  if (event.key === 'Escape' && showSearchResults.value) {
-    closeSearch()
-  }
+  // Cmd+K (Mac) or Ctrl+K (Windows/Linux) - now handled by CommandPalette component
+  // This is kept here in case we want to add other shortcuts
 }
 
 async function loadCompanyData() {
@@ -316,8 +154,6 @@ async function loadCompanyData() {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', handleKeyDown)
-  
   // Load company data from storage first (instant, no flash)
   companyStore.loadFromStorage()
   
@@ -351,16 +187,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('focus', loadCompanyData)
-  // Clear any pending search timeouts
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-  // Cancel any in-flight search requests
-  if (searchAbortController) {
-    searchAbortController.abort()
-  }
 })
 </script>
 
