@@ -8,6 +8,7 @@ import People from '../views/People.vue'
 import PersonDetail from '../views/PersonDetail.vue'
 import Departments from '../views/Departments.vue'
 import Structure from '../views/Structure.vue'
+import Timeline from '../views/Timeline.vue'
 import Integrations from '../views/Integrations.vue'
 import Onboarding from '../views/Onboarding.vue'
 import Login from '../views/Login.vue'
@@ -100,6 +101,12 @@ const routes = [
     path: '/structure',
     name: 'Structure',
     component: Structure,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/timeline',
+    name: 'Timeline',
+    component: Timeline,
     meta: { requiresAuth: true }
   },
   {
