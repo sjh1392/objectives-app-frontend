@@ -142,15 +142,6 @@
                 List
               </button>
             </div>
-            <!-- Auto-update toggle (only show in kanban view) -->
-            <label v-if="keyResultViewMode === 'kanban'" class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
-                v-model="autoUpdateProgressOnKanbanMove"
-                class="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span>Auto-update progress on move</span>
-            </label>
           </div>
         </div>
 
@@ -511,7 +502,6 @@ const showKeyResultForm = ref(false)
 const editingKeyResult = ref(null)
 const draggedKeyResult = ref(null)
 const draggedOverColumn = ref(null)
-const autoUpdateProgressOnKanbanMove = ref(true)
 const showAddContributor = ref(false)
 const showManageContributors = ref(false)
 const selectedContributorId = ref(null)
@@ -1090,52 +1080,14 @@ async function handleDrop(newStatus, event) {
       status: newStatus
     }
 
-    // Only auto-update progress if the toggle is enabled
-    if (autoUpdateProgressOnKanbanMove.value) {
-      // Auto-calculate progress and current value based on status
-      const progressPercent = getProgressForStatus(newStatus)
-      const targetValue = draggedKeyResult.value.target_value || 100
-      const currentValue = calculateCurrentValueFromProgress(progressPercent, targetValue)
-      
-      updateData.progress_percentage = progressPercent
-      updateData.current_value = currentValue
-    }
-
     // Optimistically update the UI immediately - this makes it feel instant
     const keyResultId = draggedKeyResult.value.id
     const keyResultIndex = keyResults.value.findIndex(kr => kr.id === keyResultId)
     if (keyResultIndex !== -1) {
-      // Update the key result immediately in the UI
+      // Update the key result immediately in the UI (only status, not progress)
       keyResults.value[keyResultIndex] = {
         ...keyResults.value[keyResultIndex],
-        status: newStatus,
-        ...(autoUpdateProgressOnKanbanMove.value && {
-          progress_percentage: updateData.progress_percentage,
-          current_value: updateData.current_value
-        })
-      }
-    }
-
-    // Optimistically update objective progress if auto-update is enabled
-    if (autoUpdateProgressOnKanbanMove.value && objective.value) {
-      // Calculate new objective progress from all key results
-      const allKeyResults = keyResults.value
-      const totalProgress = allKeyResults.reduce((sum, kr) => {
-        // Use updated progress for the moved key result
-        const krProgress = kr.id === keyResultId 
-          ? updateData.progress_percentage 
-          : (kr.progress_percentage || 0)
-        return sum + krProgress
-      }, 0)
-      const averageProgress = allKeyResults.length > 0 ? totalProgress / allKeyResults.length : 0
-      const targetValue = objective.value.target_value || 100
-      const currentValue = (averageProgress / 100) * targetValue
-      
-      // Update local objective state immediately
-      objectivesStore.currentObjective = {
-        ...objective.value,
-        progress_percentage: averageProgress,
-        current_value: currentValue
+        status: newStatus
       }
     }
 

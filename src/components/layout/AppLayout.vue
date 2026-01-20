@@ -123,12 +123,10 @@ const commandPaletteRef = ref(null)
 const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: 'grid' },
   { path: '/objectives', label: 'Objectives', icon: 'target' },
-  { path: '/timeline', label: 'Timeline', icon: 'calendar' },
+  // { path: '/timeline', label: 'Timeline', icon: 'calendar' }, // Temporarily hidden
   { path: '/people', label: 'People', icon: 'users' },
   { path: '/departments', label: 'Departments', icon: 'building' },
-  { path: '/structure', label: 'Structure', icon: 'tree' },
   { path: '/reports', label: 'Reports', icon: 'chart' },
   { path: '/integrations', label: 'Integrations', icon: 'plug' },
   { path: '/onboarding', label: 'Get Started', icon: 'rocket' }

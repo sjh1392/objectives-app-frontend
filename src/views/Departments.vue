@@ -19,6 +19,13 @@
             >
               Grid
             </button>
+            <button
+              @click="viewMode = 'tree'"
+              :class="viewMode === 'tree' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'"
+              class="px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Tree
+            </button>
           </div>
           <button
             v-if="selectedDepartments.length > 0"
@@ -48,8 +55,13 @@
         </div>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="usersStore.loading || objectivesStore.loading" class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+
       <!-- Table View -->
-      <div v-if="viewMode === 'table' && usersStore.departments.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
+      <div v-else-if="viewMode === 'table' && usersStore.departments.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
@@ -177,8 +189,122 @@
         </div>
       </div>
 
-      <!-- Empty State -->
-      <div v-if="usersStore.departments.length === 0" class="text-center py-12 bg-white rounded-lg shadow-md">
+      <!-- Tree View -->
+      <div v-else-if="viewMode === 'tree'" class="bg-white rounded-lg shadow-md p-8">
+        <div class="space-y-8">
+          <!-- Unassigned People -->
+          <div v-if="unassignedPeople.length > 0" class="border-l-4 border-gray-300 pl-6">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Unassigned People</h2>
+            <div class="space-y-2 ml-4">
+              <div
+                v-for="person in unassignedPeople"
+                :key="person.id"
+                class="flex items-center gap-3 py-2"
+              >
+                <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span class="font-medium text-gray-900">{{ person.name }}</span>
+                <span class="text-sm text-gray-500">{{ person.email }}</span>
+                <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 capitalize">
+                  {{ person.role }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Departments Tree -->
+          <div v-for="department in usersStore.departments" :key="department.id" class="border-l-4 border-primary-500 pl-6">
+            <!-- Department Node -->
+            <div class="mb-4">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-4 h-4 bg-primary-500 rounded-full"></div>
+                <h2 class="text-xl font-bold text-gray-900">{{ department.name }}</h2>
+              </div>
+              <p v-if="department.description" class="text-sm text-gray-600 ml-7 mb-2">
+                {{ department.description }}
+              </p>
+              <div v-if="department.manager_id" class="flex items-center gap-2 ml-7 mb-4">
+                <span class="text-sm text-gray-600">Manager:</span>
+                <span class="text-sm font-medium text-primary-700">{{ getManagerName(department.manager_id) }}</span>
+              </div>
+            </div>
+
+            <!-- People Nodes -->
+            <div v-if="getDepartmentMembers(department.id).length > 0" class="ml-8 space-y-2">
+              <div
+                v-for="member in getDepartmentMembers(department.id)"
+                :key="member.id"
+                class="flex items-center gap-3 py-2 pl-4 border-l-2"
+                :class="member.id === department.manager_id ? 'border-primary-400 bg-primary-50 rounded-r' : 'border-gray-200'"
+              >
+                <div
+                  class="w-2 h-2 rounded-full"
+                  :class="member.id === department.manager_id ? 'bg-primary-500' : 'bg-gray-400'"
+                ></div>
+                <span class="font-medium text-gray-900">{{ member.name }}</span>
+                <span class="text-sm text-gray-500">{{ member.email }}</span>
+                <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 capitalize">
+                  {{ member.role }}
+                </span>
+                <span
+                  v-if="member.id === department.manager_id"
+                  class="px-2 py-0.5 text-xs rounded-full bg-primary-200 text-primary-800 font-medium"
+                >
+                  Manager
+                </span>
+              </div>
+            </div>
+            <div v-else class="ml-8 text-sm text-gray-400 italic py-2">
+              No members assigned
+            </div>
+
+            <!-- Department Objectives in Tree View -->
+            <div v-if="getDepartmentObjectives(department.id).length > 0" class="ml-8 mt-4 pl-4 border-l-2 border-primary-300">
+              <div class="mb-2">
+                <span class="text-sm font-medium text-gray-700">
+                  Objectives ({{ getDepartmentObjectives(department.id).length }})
+                </span>
+              </div>
+              <div class="space-y-2">
+                <router-link
+                  v-for="objective in getDepartmentObjectives(department.id)"
+                  :key="objective.id"
+                  :to="`/objectives/${objective.id}`"
+                  class="block py-2 pl-4 border-l-2 border-gray-200 hover:bg-gray-50 rounded-r transition-colors"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    <span class="font-medium text-gray-900">{{ objective.title }}</span>
+                    <span class="text-xs text-gray-500">
+                      ({{ Math.round(objective.progress_percentage || 0) }}%)
+                    </span>
+                    <span
+                      class="px-2 py-0.5 text-xs rounded-full"
+                      :class="{
+                        'bg-green-100 text-green-800': objective.status === 'Active',
+                        'bg-blue-100 text-blue-800': objective.status === 'Completed',
+                        'bg-yellow-100 text-yellow-800': objective.status === 'On Hold',
+                        'bg-gray-100 text-gray-800': objective.status === 'Draft',
+                        'bg-red-100 text-red-800': objective.status === 'Cancelled'
+                      }"
+                    >
+                      {{ objective.status }}
+                    </span>
+                  </div>
+                </router-link>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="usersStore.departments.length === 0 && unassignedPeople.length === 0" class="text-center py-12">
+            <p class="text-gray-500 text-lg">No organizational structure defined yet.</p>
+            <p class="text-gray-400 text-sm mt-2">Add departments and people to see the structure.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State for Table/Grid views -->
+      <div v-else-if="usersStore.departments.length === 0" class="text-center py-12 bg-white rounded-lg shadow-md">
         <p class="text-gray-500 text-lg">No departments found. Add your first department!</p>
       </div>
     </div>
@@ -186,21 +312,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUsersStore } from '../stores/users'
+import { useObjectivesStore } from '../stores/objectives'
 import AppLayout from '../components/layout/AppLayout.vue'
 import DepartmentForm from '../components/departments/DepartmentForm.vue'
 
 const usersStore = useUsersStore()
+const objectivesStore = useObjectivesStore()
 
 const showForm = ref(false)
 const editingDepartment = ref(null)
 const viewMode = ref('table')
 const selectedDepartments = ref([])
 
+const unassignedPeople = computed(() => {
+  return usersStore.users.filter(user => !user.department)
+})
+
 onMounted(async () => {
   await usersStore.fetchDepartments()
   await usersStore.fetchUsers()
+  await objectivesStore.fetchObjectives()
 })
 
 function getManagerName(managerId) {
@@ -209,7 +342,19 @@ function getManagerName(managerId) {
 }
 
 function getDepartmentMembers(departmentId) {
-  return usersStore.users.filter(user => user.department === departmentId)
+  const members = usersStore.users.filter(user => user.department === departmentId)
+  // Sort: manager first, then by name
+  const department = usersStore.departments.find(d => d.id === departmentId)
+  if (!department) return members
+  return members.sort((a, b) => {
+    if (a.id === department.manager_id) return -1
+    if (b.id === department.manager_id) return 1
+    return a.name.localeCompare(b.name)
+  })
+}
+
+function getDepartmentObjectives(departmentId) {
+  return objectivesStore.objectives.filter(obj => obj.department_id === departmentId)
 }
 
 function editDepartment(department) {

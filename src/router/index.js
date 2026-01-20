@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import Dashboard from '../views/Dashboard.vue'
+// import Dashboard from '../views/Dashboard.vue' // Removed - redirecting to Objectives
 import ObjectivesList from '../views/ObjectivesList.vue'
 import ObjectiveDetail from '../views/ObjectiveDetail.vue'
 import Reports from '../views/Reports.vue'
 import People from '../views/People.vue'
 import PersonDetail from '../views/PersonDetail.vue'
 import Departments from '../views/Departments.vue'
-import Structure from '../views/Structure.vue'
+// import Structure from '../views/Structure.vue' // Merged into Departments
 import Timeline from '../views/Timeline.vue'
 import Integrations from '../views/Integrations.vue'
 import Onboarding from '../views/Onboarding.vue'
@@ -57,9 +57,7 @@ const routes = [
   },
   {
     path: '/',
-    name: 'Dashboard',
-    component: Dashboard,
-    meta: { requiresAuth: true }
+    redirect: '/objectives'
   },
   {
     path: '/objectives',
@@ -99,9 +97,7 @@ const routes = [
   },
   {
     path: '/structure',
-    name: 'Structure',
-    component: Structure,
-    meta: { requiresAuth: true }
+    redirect: '/departments'
   },
   {
     path: '/timeline',
@@ -156,7 +152,7 @@ router.beforeEach(async (to, from, next) => {
   
   // Check if route requires guest (not authenticated)
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next({ name: 'Dashboard' })
+    next({ name: 'ObjectivesList' })
     return
   }
   
