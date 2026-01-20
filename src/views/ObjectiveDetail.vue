@@ -474,7 +474,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useObjectivesStore } from '../stores/objectives'
 import { useUsersStore } from '../stores/users'
@@ -595,6 +595,9 @@ function handleClickOutside(event) {
   }
 }
 
+// Auto-refresh interval for webhook updates
+let refreshInterval = null
+
 onMounted(async () => {
   try {
     // Only fetch users if not already loaded (avoid duplicate requests)
@@ -615,6 +618,17 @@ onMounted(async () => {
     ])
     
     document.addEventListener('click', handleClickOutside)
+    
+    // Set up auto-refresh to catch webhook updates (every 10 seconds)
+    refreshInterval = setInterval(async () => {
+      try {
+        await loadObjective()
+        await loadProgressUpdates()
+        await loadComments()
+      } catch (error) {
+        console.error('Error refreshing objective data:', error)
+      }
+    }, 10000)
   } catch (error) {
     console.error('Error in onMounted:', error)
     // Ensure click handler is still added even on error
@@ -624,6 +638,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
 })
 
 async function loadObjective() {
