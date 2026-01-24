@@ -211,6 +211,7 @@
                     <Avatar
                       :name="getOwner(objective.owner_id).name"
                       :email="getOwner(objective.owner_id).email"
+                      :image-url="getOwner(objective.owner_id).avatar"
                       size="sm"
                     />
                     <span class="text-sm text-gray-900">{{ getOwner(objective.owner_id).name }}</span>

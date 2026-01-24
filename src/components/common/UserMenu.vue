@@ -4,8 +4,15 @@
       @click="toggleDropdown"
       class="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
-      <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
-        {{ userInitials }}
+      <Avatar
+        v-if="currentUser"
+        :name="currentUser.name"
+        :email="currentUser.email"
+        :image-url="currentUser.avatar"
+        size="sm"
+      />
+      <div v-else class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+        ?
       </div>
       <div class="text-left hidden md:block">
         <div class="text-sm font-medium text-gray-900">{{ currentUser?.name || 'Not signed in' }}</div>
@@ -43,9 +50,12 @@
             class="w-full px-3 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-3"
             :class="{ 'bg-blue-50 border border-blue-200': currentUserId === user.id }"
           >
-            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
-              {{ getUserInitials(user) }}
-            </div>
+            <Avatar
+              :name="user.name"
+              :email="user.email"
+              :image-url="user.avatar"
+              size="sm"
+            />
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium text-gray-900 truncate">{{ user.name }}</div>
               <div class="text-xs text-gray-500 truncate">{{ user.email }}</div>
@@ -83,6 +93,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUsersStore } from '@/stores/users'
 import { useNotificationsStore } from '@/stores/notifications'
+import Avatar from './Avatar.vue'
 
 const authStore = useAuthStore()
 const usersStore = useUsersStore()
@@ -101,22 +112,6 @@ const currentUser = computed(() => {
   return usersStore.getUserById(currentUserId.value)
 })
 
-const userInitials = computed(() => {
-  if (!currentUser.value) return '?'
-  const names = currentUser.value.name.split(' ')
-  if (names.length >= 2) {
-    return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-  }
-  return currentUser.value.name.substring(0, 2).toUpperCase()
-})
-
-function getUserInitials(user) {
-  const names = user.name.split(' ')
-  if (names.length >= 2) {
-    return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-  }
-  return user.name.substring(0, 2).toUpperCase()
-}
 
 function toggleDropdown() {
   isOpen.value = !isOpen.value

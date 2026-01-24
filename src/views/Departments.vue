@@ -1,6 +1,17 @@
 <template>
   <AppLayout>
-    <div>
+    <div v-if="!hasOrganization" class="text-center py-12">
+      <div class="max-w-md mx-auto">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+        <h2 class="mt-4 text-xl font-semibold text-gray-900">No Organization</h2>
+        <p class="mt-2 text-sm text-gray-500">
+          You are not associated with any organization. Please contact an administrator to be added to an organization.
+        </p>
+      </div>
+    </div>
+    <div v-else-if="hasOrganization">
       <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-900">Departments</h1>
         <div class="flex gap-3">
@@ -315,25 +326,34 @@
 import { ref, computed, onMounted } from 'vue'
 import { useUsersStore } from '../stores/users'
 import { useObjectivesStore } from '../stores/objectives'
+import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/layout/AppLayout.vue'
 import DepartmentForm from '../components/departments/DepartmentForm.vue'
 
 const usersStore = useUsersStore()
 const objectivesStore = useObjectivesStore()
+const authStore = useAuthStore()
 
 const showForm = ref(false)
 const editingDepartment = ref(null)
 const viewMode = ref('table')
 const selectedDepartments = ref([])
 
+const hasOrganization = computed(() => {
+  return !!authStore.organizationId
+})
+
 const unassignedPeople = computed(() => {
   return usersStore.users.filter(user => !user.department)
 })
 
 onMounted(async () => {
-  await usersStore.fetchDepartments()
-  await usersStore.fetchUsers()
-  await objectivesStore.fetchObjectives()
+  // Only fetch data if user has an organization
+  if (hasOrganization.value) {
+    await usersStore.fetchDepartments()
+    await usersStore.fetchUsers()
+    await objectivesStore.fetchObjectives()
+  }
 })
 
 function getManagerName(managerId) {

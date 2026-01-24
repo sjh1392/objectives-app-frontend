@@ -9,7 +9,7 @@
       <div class="bg-white rounded-lg shadow-md p-6 mb-4">
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-6 flex-1">
-            <Avatar :name="person.name" :email="person.email" size="xl" />
+            <Avatar :name="person.name" :email="person.email" :image-url="person.avatar" size="xl" />
             <div class="flex-1">
               <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ person.name }}</h1>
               <p class="text-gray-600 mb-4">{{ person.email }}</p>

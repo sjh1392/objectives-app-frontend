@@ -105,9 +105,11 @@
 import { ref, onMounted } from 'vue'
 import api from '../../services/api'
 import { useCompanyStore } from '../../stores/company'
+import { useAuthStore } from '../../stores/auth'
 
 const emit = defineEmits(['step-complete', 'data-updated'])
 const companyStore = useCompanyStore()
+const authStore = useAuthStore()
 
 const formData = ref({
   name: '',
@@ -233,6 +235,18 @@ async function handleSubmit() {
       description: formData.value.description,
       logo_url: logoUrl
     })
+    
+    // Also update organization name if user has an organization
+    if (authStore.organizationId && formData.value.name) {
+      try {
+        await api.put(`/organizations/${authStore.organizationId}`, {
+          name: formData.value.name
+        })
+      } catch (error) {
+        console.error('Error updating organization name:', error)
+        // Don't fail the whole operation if org update fails
+      }
+    }
     
     // Update the store immediately
     companyStore.setCompanyData({

@@ -157,6 +157,72 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async loginWithGoogle(redirectPath = '/') {
+      this.loading = true
+      this.error = null
+      try {
+        // Store redirect path in sessionStorage
+        sessionStorage.setItem('googleOAuthRedirect', redirectPath)
+        
+        // Get the redirect URI from current window location
+        const redirectUri = `${window.location.origin}/auth/google/callback`
+        console.log('Frontend redirect URI:', redirectUri)
+        
+        // Get Google OAuth URL from backend, passing the redirect URI
+        const response = await api.get('/auth/google', {
+          params: { 
+            redirect: redirectPath,
+            redirectUri: redirectUri
+          }
+        })
+        
+        const { authUrl, redirectUri: backendRedirectUri } = response.data
+        console.log('Backend redirect URI:', backendRedirectUri)
+        console.log('Auth URL:', authUrl)
+        
+        // Log warning if redirect URIs don't match
+        if (redirectUri !== backendRedirectUri) {
+          console.warn('⚠️ Redirect URI mismatch!')
+          console.warn('Frontend:', redirectUri)
+          console.warn('Backend:', backendRedirectUri)
+          console.warn('Make sure this matches exactly in Google Cloud Console')
+        }
+        
+        // Redirect to Google OAuth
+        window.location.href = authUrl
+        
+        // Return pending state (will be handled by callback page)
+        return { success: true, pending: true }
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Google sign-in failed'
+        this.loading = false
+        return { success: false, error: this.error }
+      }
+    },
+
+    async exchangeGoogleCode(code) {
+      try {
+        // Get the redirect URI from the current window location
+        const redirectUri = `${window.location.origin}/auth/google/callback`
+        console.log('Exchanging code with redirect URI:', redirectUri)
+        
+        const response = await api.post('/auth/google/callback', { 
+          code,
+          redirectUri 
+        })
+        const { token, user } = response.data
+        
+        this.setToken(token)
+        this.setCurrentUser(user)
+        
+        return { success: true }
+      } catch (error) {
+        console.error('Exchange error:', error.response?.data)
+        this.error = error.response?.data?.error || 'Failed to complete Google sign-in'
+        return { success: false, error: this.error }
+      }
+    },
+
     async logout() {
       try {
         if (this.token) {

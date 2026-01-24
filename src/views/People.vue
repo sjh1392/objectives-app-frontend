@@ -91,7 +91,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center gap-3">
-                  <Avatar :name="user.name" :email="user.email" size="sm" />
+                  <Avatar :name="user.name" :email="user.email" :image-url="user.avatar" size="sm" />
                   <router-link
                     :to="`/people/${user.id}`"
                     class="text-sm font-medium text-primary-600 hover:text-primary-800"
@@ -144,7 +144,7 @@
           class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
         >
           <div class="flex items-start gap-4 mb-4">
-            <Avatar :name="user.name" :email="user.email" size="lg" />
+            <Avatar :name="user.name" :email="user.email" :image-url="user.avatar" size="lg" />
             <div class="flex-1">
               <router-link :to="`/people/${user.id}`" class="block">
                 <h3 class="text-xl font-semibold text-primary-600 hover:text-primary-800 mb-1">{{ user.name }}</h3>

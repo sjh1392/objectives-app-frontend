@@ -23,7 +23,7 @@
               @keydown.esc="close"
               @keydown.down.prevent="navigateDown"
               @keydown.up.prevent="navigateUp"
-              @keydown.enter="selectItem"
+              @keydown.enter.prevent="selectItem"
             />
             <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
               <div class="flex items-center gap-4">
@@ -68,10 +68,11 @@
               >
                 <div class="flex items-center gap-3">
                   <div class="flex-shrink-0">
-                    <component :is="getIcon(item.type)" />
+                    <component :is="getIcon(item.type)" v-if="item.type" />
+                    <span v-else class="w-5 h-5"></span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-gray-900 truncate">{{ item.title }}</div>
+                    <div class="text-sm font-medium text-gray-900 truncate">{{ item.title || 'Untitled' }}</div>
                     <div v-if="item.subtitle" class="text-xs text-gray-500 truncate">{{ item.subtitle }}</div>
                   </div>
                   <div v-if="item.meta" class="flex-shrink-0 text-xs text-gray-400">
@@ -177,14 +178,17 @@ async function performSearch(searchQuery) {
       })
       const objectives = objectivesResponse.data || []
       objectives.forEach(obj => {
-        allResults.push({
-          id: `objective-${obj.id}`,
-          type: 'objective',
-          title: obj.title,
-          subtitle: obj.description || `Status: ${obj.status}`,
-          meta: obj.owner_id ? usersStore.getUserById(obj.owner_id)?.name : 'Unassigned',
-          url: `/objectives/${obj.id}`
-        })
+        if (obj && obj.id) {
+          const owner = obj.owner_id ? usersStore.getUserById(obj.owner_id) : null
+          allResults.push({
+            id: `objective-${obj.id}`,
+            type: 'objective',
+            title: obj.title || 'Untitled Objective',
+            subtitle: obj.description || `Status: ${obj.status || 'Unknown'}`,
+            meta: owner?.name || 'Unassigned',
+            url: `/objectives/${obj.id}`
+          })
+        }
       })
     } catch (error) {
       console.error('Error searching objectives:', error)
@@ -194,17 +198,20 @@ async function performSearch(searchQuery) {
     try {
       const users = usersStore.users || []
       users.forEach(user => {
-        const nameMatch = user.name?.toLowerCase().includes(searchTerm)
-        const emailMatch = user.email?.toLowerCase().includes(searchTerm)
-        if (nameMatch || emailMatch) {
-          allResults.push({
-            id: `user-${user.id}`,
-            type: 'person',
-            title: user.name,
-            subtitle: user.email,
-            meta: user.department ? usersStore.getDepartmentById(user.department)?.name : 'Unassigned',
-            url: `/people/${user.id}`
-          })
+        if (user && user.id) {
+          const nameMatch = user.name?.toLowerCase().includes(searchTerm)
+          const emailMatch = user.email?.toLowerCase().includes(searchTerm)
+          if (nameMatch || emailMatch) {
+            const department = user.department ? usersStore.getDepartmentById(user.department) : null
+            allResults.push({
+              id: `user-${user.id}`,
+              type: 'person',
+              title: user.name || 'Unnamed User',
+              subtitle: user.email || '',
+              meta: department?.name || 'Unassigned',
+              url: `/people/${user.id}`
+            })
+          }
         }
       })
     } catch (error) {
@@ -216,11 +223,11 @@ async function performSearch(searchQuery) {
       await usersStore.fetchDepartments()
       const teams = usersStore.departments || []
       teams.forEach(team => {
-        if (team.name?.toLowerCase().includes(searchTerm)) {
+        if (team && team.id && team.name?.toLowerCase().includes(searchTerm)) {
           allResults.push({
             id: `team-${team.id}`,
             type: 'team',
-            title: team.name,
+            title: team.name || 'Unnamed Team',
             subtitle: `${team.users?.length || 0} members`,
             meta: null,
             url: `/structure`
@@ -259,14 +266,27 @@ const groupedResults = computed(() => {
 })
 
 function getItemIndex(groupIndex, itemIndex) {
+  if (!groupedResults.value || groupIndex < 0 || groupIndex >= groupedResults.value.length) {
+    return -1
+  }
   let index = 0
   for (let i = 0; i < groupIndex; i++) {
-    index += groupedResults.value[i].items.length
+    if (groupedResults.value[i] && groupedResults.value[i].items) {
+      index += groupedResults.value[i].items.length
+    }
   }
-  return index + itemIndex
+  const group = groupedResults.value[groupIndex]
+  if (group && group.items && itemIndex >= 0 && itemIndex < group.items.length) {
+    return index + itemIndex
+  }
+  return -1
 }
 
 function navigateDown() {
+  if (results.value.length === 0) {
+    selectedIndex.value = -1
+    return
+  }
   if (selectedIndex.value < results.value.length - 1) {
     selectedIndex.value++
   } else {
@@ -275,6 +295,10 @@ function navigateDown() {
 }
 
 function navigateUp() {
+  if (results.value.length === 0) {
+    selectedIndex.value = -1
+    return
+  }
   if (selectedIndex.value > 0) {
     selectedIndex.value--
   } else {
@@ -283,11 +307,15 @@ function navigateUp() {
 }
 
 function setSelectedIndex(index) {
-  selectedIndex.value = index
+  if (index >= 0 && index < results.value.length) {
+    selectedIndex.value = index
+  } else {
+    selectedIndex.value = -1
+  }
 }
 
 function selectItem(item = null) {
-  const selectedItem = item || results.value[selectedIndex.value]
+  const selectedItem = item || (selectedIndex.value >= 0 && selectedIndex.value < results.value.length ? results.value[selectedIndex.value] : null)
   if (selectedItem && selectedItem.url) {
     close()
     router.push(selectedItem.url)
@@ -298,12 +326,23 @@ function toggle() {
   isOpen.value = !isOpen.value
 }
 
+function open() {
+  isOpen.value = true
+}
+
 function close() {
   isOpen.value = false
   query.value = ''
   results.value = []
   selectedIndex.value = -1
 }
+
+// Expose methods for parent component
+defineExpose({
+  open,
+  close,
+  toggle
+})
 
 // Icon components
 const ObjectiveIcon = {

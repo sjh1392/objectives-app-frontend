@@ -31,7 +31,7 @@
         class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
       >
         <div class="flex items-center gap-3 flex-1">
-          <Avatar :name="user.name" :email="user.email" size="sm" />
+          <Avatar :name="user.name" :email="user.email" :image-url="user.avatar" size="sm" />
           <div>
             <h3 class="font-medium text-gray-900">{{ user.name }}</h3>
             <p class="text-sm text-gray-500">{{ user.email }}</p>

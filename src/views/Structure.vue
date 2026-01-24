@@ -43,7 +43,7 @@
                   class="bg-white rounded-lg border-2 border-dashed border-gray-300 p-4 hover:border-primary-400 transition-colors"
                 >
                   <div class="flex items-start gap-3">
-                    <Avatar :name="person.name" :email="person.email" size="md" />
+                    <Avatar :name="person.name" :email="person.email" :image-url="person.avatar" size="md" />
                     <div class="flex-1">
                       <h3 class="font-semibold text-gray-900">{{ person.name }}</h3>
                       <p class="text-sm text-gray-500 mt-1">{{ person.email }}</p>
@@ -87,7 +87,7 @@
                   class="rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
                   <div class="flex items-start gap-3 mb-2">
-                    <Avatar :name="member.name" :email="member.email" size="md" />
+                    <Avatar :name="member.name" :email="member.email" :image-url="member.avatar" size="md" />
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <h4 class="font-semibold text-gray-900">{{ member.name }}</h4>

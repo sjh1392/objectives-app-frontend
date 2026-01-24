@@ -14,6 +14,24 @@
           </div>
           <div class="flex gap-2">
             <button
+              @click="refreshData"
+              :disabled="isRefreshing"
+              class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              title="Refresh data"
+            >
+              <svg 
+                class="w-5 h-5 transition-transform"
+                :class="{ 'animate-spin': isRefreshing }"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span v-if="!isRefreshing">Refresh</span>
+              <span v-else>Refreshing...</span>
+            </button>
+            <button
               @click="toggleSubscription"
               :disabled="subscriptionLoading"
               class="px-4 py-2 border rounded-md transition-colors flex items-center gap-2"
@@ -79,7 +97,7 @@
               :to="`/people/${objective.owner_id}`"
               class="flex items-center gap-2 hover:opacity-75"
             >
-              <Avatar :name="owner.name" :email="owner.email" size="sm" />
+              <Avatar :name="owner.name" :email="owner.email" :image-url="owner.avatar" size="sm" />
               <span class="text-sm font-medium text-gray-900">{{ owner.name }}</span>
             </router-link>
           </div>
@@ -94,7 +112,7 @@
                 :to="`/people/${contributor.id}`"
                 class="hover:z-10 hover:scale-110 transition-transform"
               >
-                <Avatar :name="contributor.name" :email="contributor.email" size="sm" />
+                <Avatar :name="contributor.name" :email="contributor.email" :image-url="contributor.avatar" size="sm" />
               </router-link>
               <span v-if="objective.contributors.length > 3" class="ml-2 text-xs text-gray-500">
                 +{{ objective.contributors.length - 3 }}
@@ -268,7 +286,7 @@
                 class="flex items-center justify-between p-2 bg-gray-50 rounded"
               >
                 <div class="flex items-center gap-2">
-                  <Avatar :name="contributor.name" :email="contributor.email" size="sm" />
+                  <Avatar :name="contributor.name" :email="contributor.email" :image-url="contributor.avatar" size="sm" />
                   <span class="text-sm">{{ contributor.name }}</span>
                 </div>
                 <button
@@ -386,7 +404,7 @@
                   index === selectedMentionIndex ? 'bg-primary-50' : ''
                 ]"
               >
-                <Avatar :name="user.name" :email="user.email" size="sm" />
+                <Avatar :name="user.name" :email="user.email" :image-url="user.avatar" size="sm" />
                 <div>
                   <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
                   <div class="text-xs text-gray-500">{{ user.email }}</div>
@@ -396,6 +414,15 @@
                 No users found
               </div>
             </div>
+          </div>
+          
+          <!-- Media Recorder -->
+          <div class="mb-4">
+            <MediaRecorder
+              v-model="updateForm.media_url"
+              v-model:media-type="updateForm.media_type"
+              @media-uploaded="handleMediaUploaded"
+            />
           </div>
           
           <div class="flex items-center justify-between gap-4">
@@ -417,7 +444,7 @@
             <div class="flex-shrink-0">
               <button
                 type="submit"
-                :disabled="!updateForm.current_value && !updateForm.comment.trim()"
+                :disabled="!updateForm.current_value && !updateForm.comment.trim() && !updateForm.media_url"
                 class="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
               >
                 Update
@@ -436,15 +463,109 @@
             <Avatar
               :name="item.user_name || 'Unknown'"
               :email="item.user_email || ''"
+              :image-url="item.user_avatar"
               size="sm"
             />
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-sm font-medium text-gray-900">{{ item.user_name || 'System' }}</span>
-                <span v-if="!item.user_id" class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">Webhook</span>
-                <span class="text-xs text-gray-500">{{ formatDateTime(item.created_at) }}</span>
+            <div class="flex-1 relative">
+              <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-gray-900">{{ item.user_name || 'System' }}</span>
+                  <span v-if="!item.user_id" class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">Webhook</span>
+                  <span class="text-xs text-gray-500">{{ formatDateTime(item.created_at) }}</span>
+                  <span v-if="item.updated_at && item.updated_at !== item.created_at" class="text-xs text-gray-400">(edited)</span>
+                </div>
+                
+                <!-- Three-dot menu (only for comments, only for owner) -->
+                <div 
+                  v-if="item.id && item.user_id && item.user_id === currentUserId && !item.previous_value"
+                  class="relative group"
+                >
+                  <!-- Three dots button -->
+                  <button
+                    v-if="editingCommentId !== item.id"
+                    data-comment-menu
+                    class="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+                    @click.stop="toggleCommentMenu(item.id)"
+                  >
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                  
+                  <!-- Save/Cancel buttons when editing -->
+                  <div v-else class="flex gap-2">
+                    <button
+                      @click="saveEditComment(item)"
+                      class="text-xs text-primary-600 hover:text-primary-800 px-2 py-1 rounded hover:bg-primary-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      @click="cancelEditComment"
+                      class="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  
+                  <!-- Dropdown menu -->
+                  <div
+                    v-if="openCommentMenuId === item.id && editingCommentId !== item.id"
+                    class="comment-menu-dropdown absolute right-0 top-8 z-50 w-32 bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                    @click.stop
+                  >
+                    <button
+                      @click="startEditComment(item)"
+                      class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
+                    </button>
+                    <button
+                      @click="confirmDeleteComment(item)"
+                      class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div v-if="item.content" class="text-sm text-gray-700" v-html="formatCommentContent(item.content)"></div>
+              
+              <!-- Edit mode -->
+              <div v-if="editingCommentId === item.id" class="mb-2">
+                <textarea
+                  v-model="editingCommentText"
+                  rows="3"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 resize-y"
+                  placeholder="Edit your comment..."
+                ></textarea>
+                <div v-if="item.media_url" class="mt-2 text-xs text-gray-500">
+                  Note: Media attachments cannot be edited. Delete and re-upload if needed.
+                </div>
+              </div>
+              
+              <!-- Display mode -->
+              <div v-else>
+                <div v-if="item.content" class="text-sm text-gray-700" v-html="formatCommentContent(item.content)"></div>
+              </div>
+              
+              <!-- Media Display (only for comments, not progress updates) -->
+              <div v-if="item.media_url && !item.previous_value" class="mt-3">
+                <div v-if="item.media_type === 'audio'" class="bg-gray-50 rounded-md p-3">
+                  <div class="text-xs text-gray-600 mb-2">Voice Note</div>
+                  <audio :src="item.media_url" controls class="w-full"></audio>
+                </div>
+                <div v-else-if="item.media_type === 'video'" class="bg-gray-50 rounded-md p-3">
+                  <div class="text-xs text-gray-600 mb-2">Video Note</div>
+                  <video :src="item.media_url" controls class="w-full rounded-md max-w-md"></video>
+                </div>
+              </div>
+              
               <div v-if="item.previous_value !== undefined" class="text-sm text-gray-700">
                 Updated progress: <span class="font-medium">{{ item.previous_value }}</span> → 
                 <span class="font-medium">{{ item.new_value }}</span>
@@ -483,6 +604,7 @@ import AppLayout from '../components/layout/AppLayout.vue'
 import ProgressBar from '../components/common/ProgressBar.vue'
 import Tag from '../components/common/Tag.vue'
 import Avatar from '../components/common/Avatar.vue'
+import MediaRecorder from '../components/common/MediaRecorder.vue'
 import ObjectiveForm from '../components/objectives/ObjectiveForm.vue'
 import KeyResultForm from '../components/keyresults/KeyResultForm.vue'
 import KeyResultCard from '../components/keyresults/KeyResultCard.vue'
@@ -509,9 +631,15 @@ const comments = ref([])
 const isSubscribed = ref(false)
 const subscriptionLoading = ref(false)
 const progressUpdates = ref([])
+const editingCommentId = ref(null)
+const editingCommentText = ref('')
+const openCommentMenuId = ref(null)
+const currentUserId = computed(() => authStore.currentUserId || usersStore.users[0]?.id || null)
 const updateForm = ref({
   current_value: null,
-  comment: ''
+  comment: '',
+  media_url: null,
+  media_type: null
 })
 const commentTextarea = ref(null)
 const showMentionDropdown = ref(false)
@@ -565,6 +693,182 @@ const filteredMentionUsers = computed(() => {
   ).slice(0, 5)
 })
 
+// Handle media uploaded event - automatically create comment
+async function handleMediaUploaded(mediaData) {
+  console.log('handleMediaUploaded called with:', mediaData)
+  
+  // Only auto-submit if there's no text comment and no value update
+  if (updateForm.value.comment.trim() || updateForm.value.current_value !== null) {
+    // User has other content, they can click Update button
+    console.log('Skipping auto-submit - user has other content')
+    return
+  }
+  
+  const currentUserId = authStore.currentUserId || usersStore.users[0]?.id || null
+  
+  if (!currentUserId) {
+    console.error('Cannot save media comment: user_id is not set')
+    return
+  }
+  
+  console.log('Creating comment for user:', currentUserId)
+  
+  // Create comment optimistically
+  const tempComment = {
+    id: `temp-${Date.now()}`,
+    objective_id: route.params.id,
+    user_id: currentUserId,
+    content: mediaData.type === 'audio' ? 'Voice note' : 'Video note',
+    media_url: mediaData.url,
+    media_type: mediaData.type,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    user_name: usersStore.users.find(u => u.id === currentUserId)?.name || 'Unknown',
+    user_email: usersStore.users.find(u => u.id === currentUserId)?.email || ''
+  }
+  
+  // Add comment optimistically to the top of the list
+  comments.value = [tempComment, ...comments.value]
+  
+  try {
+    console.log('Creating comment with media:', { url: mediaData.url, type: mediaData.type })
+    const response = await api.post(`/objectives/${route.params.id}/comments`, {
+      user_id: currentUserId,
+      content: mediaData.type === 'audio' ? 'Voice note' : 'Video note',
+      media_url: mediaData.url,
+      media_type: mediaData.type
+    })
+    
+    console.log('Comment created response:', response.data)
+    
+    if (response.data) {
+      // Replace temp comment with real one from server
+      const commentIndex = comments.value.findIndex(c => c.id === tempComment.id)
+      if (commentIndex !== -1) {
+        comments.value[commentIndex] = response.data
+        console.log('Updated comment in array:', comments.value[commentIndex])
+      } else {
+        comments.value = [response.data, ...comments.value.filter(c => c.id !== tempComment.id)]
+        console.log('Added new comment to array')
+      }
+    } else {
+      console.warn('No data in response, reloading comments')
+      // If no data, reload comments
+      await loadComments()
+    }
+    
+    // Reset media form fields
+    updateForm.value.media_url = null
+    updateForm.value.media_type = null
+    
+    // Reload comments to ensure sync
+    setTimeout(() => {
+      loadComments().catch(err => {
+        console.error('Failed to reload comments:', err)
+      })
+    }, 500)
+  } catch (error) {
+    console.error('Error saving media comment:', error)
+    console.error('Error details:', error.response?.data)
+    // Remove optimistic comment on error
+    comments.value = comments.value.filter(c => c.id !== tempComment.id)
+    alert(`Failed to save media comment: ${error.response?.data?.error || error.message}`)
+  }
+}
+
+// Comment edit/delete functions
+function toggleCommentMenu(commentId) {
+  if (openCommentMenuId.value === commentId) {
+    openCommentMenuId.value = null
+  } else {
+    openCommentMenuId.value = commentId
+  }
+}
+
+function startEditComment(comment) {
+  editingCommentId.value = comment.id
+  editingCommentText.value = comment.content || ''
+  openCommentMenuId.value = null // Close menu when starting edit
+}
+
+function cancelEditComment() {
+  editingCommentId.value = null
+  editingCommentText.value = ''
+  openCommentMenuId.value = null
+}
+
+async function saveEditComment(comment) {
+  if (!editingCommentText.value.trim()) {
+    alert('Comment cannot be empty')
+    return
+  }
+  
+  const currentUserId = authStore.currentUserId || usersStore.users[0]?.id || null
+  if (!currentUserId) {
+    alert('Error: User not identified. Please refresh the page.')
+    return
+  }
+  
+  try {
+    const response = await api.put(`/comments/${comment.id}`, {
+      content: editingCommentText.value.trim(),
+      user_id: currentUserId
+    })
+    
+    if (response.data) {
+      // Update comment in local state
+      const commentIndex = comments.value.findIndex(c => c.id === comment.id)
+      if (commentIndex !== -1) {
+        comments.value[commentIndex] = response.data
+      }
+    }
+    
+    cancelEditComment()
+    openCommentMenuId.value = null // Close menu after saving
+    
+    // Reload comments to ensure sync
+    setTimeout(() => {
+      loadComments().catch(err => {
+        console.error('Failed to reload comments:', err)
+      })
+    }, 300)
+  } catch (error) {
+    console.error('Error updating comment:', error)
+    alert(error.response?.data?.error || 'Failed to update comment. Please try again.')
+  }
+}
+
+async function confirmDeleteComment(comment) {
+  if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+    return
+  }
+  
+  const currentUserId = authStore.currentUserId || usersStore.users[0]?.id || null
+  if (!currentUserId) {
+    alert('Error: User not identified. Please refresh the page.')
+    return
+  }
+  
+  try {
+    await api.delete(`/comments/${comment.id}`, {
+      params: { user_id: currentUserId }
+    })
+    
+    // Remove comment from local state
+    comments.value = comments.value.filter(c => c.id !== comment.id)
+    
+    // Reload comments to ensure sync
+    setTimeout(() => {
+      loadComments().catch(err => {
+        console.error('Failed to reload comments:', err)
+      })
+    }, 300)
+  } catch (error) {
+    console.error('Error deleting comment:', error)
+    alert(error.response?.data?.error || 'Failed to delete comment. Please try again.')
+  }
+}
+
 const activityFeed = computed(() => {
   const items = []
   // Add comments
@@ -586,6 +890,15 @@ const activityFeed = computed(() => {
 })
 
 function handleClickOutside(event) {
+  // Close comment menu if clicking outside
+  if (openCommentMenuId.value) {
+    const menuButton = event.target.closest('[data-comment-menu]')
+    const menuDropdown = event.target.closest('.comment-menu-dropdown')
+    if (!menuButton && !menuDropdown) {
+      openCommentMenuId.value = null
+    }
+  }
+  
   if (commentTextarea.value && !commentTextarea.value.contains(event.target)) {
     // Check if click is outside the dropdown too
     const dropdown = document.querySelector('.mention-dropdown')
@@ -595,8 +908,25 @@ function handleClickOutside(event) {
   }
 }
 
-// Auto-refresh interval for webhook updates
-let refreshInterval = null
+const isRefreshing = ref(false)
+
+// Refresh data function (can be called manually or on window focus)
+async function refreshData() {
+  if (isRefreshing.value) return // Prevent multiple simultaneous refreshes
+  
+  isRefreshing.value = true
+  try {
+    await Promise.allSettled([
+      loadObjective().catch(err => console.error('Failed to load objective:', err)),
+      loadProgressUpdates().catch(err => console.error('Failed to load progress updates:', err)),
+      loadComments().catch(err => console.error('Failed to load comments:', err))
+    ])
+  } catch (error) {
+    console.error('Error refreshing data:', error)
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 onMounted(async () => {
   try {
@@ -619,16 +949,8 @@ onMounted(async () => {
     
     document.addEventListener('click', handleClickOutside)
     
-    // Set up auto-refresh to catch webhook updates (every 10 seconds)
-    refreshInterval = setInterval(async () => {
-      try {
-        await loadObjective()
-        await loadProgressUpdates()
-        await loadComments()
-      } catch (error) {
-        console.error('Error refreshing objective data:', error)
-      }
-    }, 10000)
+    // Refresh when window regains focus (user switches back to tab)
+    window.addEventListener('focus', refreshData)
   } catch (error) {
     console.error('Error in onMounted:', error)
     // Ensure click handler is still added even on error
@@ -638,9 +960,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  window.removeEventListener('focus', refreshData)
 })
 
 async function loadObjective() {
@@ -840,7 +1160,7 @@ function insertMention(user) {
 }
 
 async function submitUpdate() {
-  if (updateForm.value.current_value === null && !updateForm.value.comment.trim()) return
+  if (updateForm.value.current_value === null && !updateForm.value.comment.trim() && !updateForm.value.media_url) return
   
   const commentText = updateForm.value.comment.trim()
   const currentValue = updateForm.value.current_value
@@ -896,7 +1216,9 @@ async function submitUpdate() {
           try {
             const commentResponse = await api.post(`/objectives/${route.params.id}/comments`, {
               user_id: currentUserId,
-              content: commentText
+              content: commentText,
+              media_url: updateForm.value.media_url,
+              media_type: updateForm.value.media_type
             })
             
             if (commentResponse.data) {
@@ -918,6 +1240,10 @@ async function submitUpdate() {
       // Reset form
       updateForm.value.comment = ''
       updateForm.value.current_value = null
+      updateForm.value.media_url = null
+      updateForm.value.media_type = null
+      updateForm.value.media_url = null
+      updateForm.value.media_type = null
       
       // Reload data in background
       Promise.all([
@@ -958,7 +1284,9 @@ async function submitUpdate() {
       
       const response = await api.post(`/objectives/${route.params.id}/comments`, {
         user_id: currentUserId,
-        content: commentText
+        content: commentText,
+        media_url: updateForm.value.media_url,
+        media_type: updateForm.value.media_type
       })
       
       if (!response.data) {
@@ -982,6 +1310,8 @@ async function submitUpdate() {
       // Reset form
       updateForm.value.comment = ''
       updateForm.value.current_value = null
+      updateForm.value.media_url = null
+      updateForm.value.media_type = null
       
       // Refresh other data in background, but keep the comment we just added
       Promise.all([
@@ -1002,6 +1332,8 @@ async function submitUpdate() {
       // Reset form
       updateForm.value.comment = ''
       updateForm.value.current_value = null
+      updateForm.value.media_url = null
+      updateForm.value.media_type = null
       
       // Silently refresh data in background
       Promise.all([

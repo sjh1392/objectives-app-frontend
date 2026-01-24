@@ -17,12 +17,20 @@ import VerifyEmail from '../views/VerifyEmail.vue'
 import ForgotPassword from '../views/ForgotPassword.vue'
 import ResetPassword from '../views/ResetPassword.vue'
 import AcceptInvitation from '../views/AcceptInvitation.vue'
+import GoogleCallback from '../views/GoogleCallback.vue'
+import Settings from '../views/Settings.vue'
 
 const routes = [
   {
     path: '/login',
     name: 'Login',
     component: Login,
+    meta: { requiresGuest: true }
+  },
+  {
+    path: '/auth/google/callback',
+    name: 'GoogleCallback',
+    component: GoogleCallback,
     meta: { requiresGuest: true }
   },
   {
@@ -115,6 +123,12 @@ const routes = [
     path: '/onboarding',
     name: 'Onboarding',
     component: Onboarding,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
     meta: { requiresAuth: true }
   }
 ]
